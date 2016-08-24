@@ -13,6 +13,8 @@ Currently support:
 [x]lte(<=) support
 [x]sql in (eg. id in (1,2,3) ) expression
 [x]paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
+[ ]sql like expression
+[ ]sql not like expression
 [ ]null check expression(is null/is not null)
 [ ]join expression
 [ ]aggregation like count(*)/group by/having support
