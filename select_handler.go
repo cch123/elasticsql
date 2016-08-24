@@ -14,6 +14,7 @@ func handleSelect(sel *sqlparser.Select) string {
 	var rootParent sqlparser.BoolExpr
 	queryMap := handleSelectWhere(&sel.Where.Expr, true, &rootParent)
 
+	//TODO change interface, add return table
 	// from means the index and the type
 	//for i, fromExpr := range sel.From {
 	//	fmt.Printf("the %d of from is %#v\n", i, sqlparser.String(fromExpr))
@@ -49,7 +50,6 @@ func handleSelect(sel *sqlparser.Select) string {
 
 	resultStr := "{" + strings.Join(resultArr, ",") + "}"
 
-	//fmt.Println(resultStr)
 	return resultStr
 
 }
@@ -65,21 +65,17 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		fmt.Println("error")
 		return ""
 	}
-	//fmt.Printf("%#v\n", (*expr))
 
 	switch (*expr).(type) {
 	case *sqlparser.AndExpr:
 		andExpr := (*expr).(*sqlparser.AndExpr)
-		//fmt.Println("and expr", expr)
 		leftExpr := andExpr.Left
 		rightExpr := andExpr.Right
-		//fmt.Printf("%#v\n", leftExpr)
-		//fmt.Printf("%#v\n", rightExpr)
 		leftStr := handleSelectWhere(&leftExpr, false, expr)
 		rightStr := handleSelectWhere(&rightExpr, false, expr)
 
 		// not toplevel
-		// 如果父节点也是and，那么结果可以直接和父结果进行合并
+		// if the parent node is also and, then the result can be merged
 		if _, ok := (*parent).(*sqlparser.AndExpr); ok {
 			return leftStr + `,` + rightStr
 		}
@@ -87,23 +83,19 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		return fmt.Sprintf(`{"bool" : {"must" : [%v, %v]}}`, leftStr, rightStr)
 	case *sqlparser.OrExpr:
 		orExpr := (*expr).(*sqlparser.OrExpr)
-		//fmt.Println("or expr", expr)
 		leftExpr := orExpr.Left
 		rightExpr := orExpr.Right
-		//fmt.Printf("%#v\n", leftExpr)
-		//fmt.Printf("%#v\n", rightExpr)
 		leftStr := handleSelectWhere(&leftExpr, false, expr)
 		rightStr := handleSelectWhere(&rightExpr, false, expr)
 
 		// not toplevel
-		// 如果父节点也是or，那么结果可以直接和父结果进行合并
+		// if the parent node is also or node, then merge the query param
 		if _, ok := (*parent).(*sqlparser.OrExpr); ok {
 			return leftStr + `,` + rightStr
 		}
 
 		return fmt.Sprintf(`{"bool" : {"should" : [%v, %v]}}`, leftStr, rightStr)
 	case *sqlparser.ComparisonExpr:
-		//fmt.Println("comparison expr", expr)
 		comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
 		colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
 
@@ -117,7 +109,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		rightStr = strings.Trim(rightStr, `'`)
 
 		resultStr := ""
-		//fmt.Println(comparisonExpr.Operator)
+
 		switch comparisonExpr.Operator {
 		case ">=":
 			resultStr = fmt.Sprintf(`{"range" : {"%v" : {"from" : "%v"}}}`, colNameStr, rightStr)
@@ -137,13 +129,10 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			rightStr = strings.Replace(rightStr, `'`, `"`, -1)
 			rightStr = strings.Trim(rightStr, "(")
 			rightStr = strings.Trim(rightStr, ")")
-
 			resultStr = fmt.Sprintf(`{"terms" : {"%v" : [%v]}}`, colNameStr, rightStr)
 		case "like":
 			rightStr = strings.Replace(rightStr, `%`, ``, -1)
-			//fmt.Println(colNameStr, rightStr)
 			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
-
 		case "not like":
 		}
 
@@ -157,11 +146,9 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 	case *sqlparser.NullCheck:
 		fmt.Println("null check expr, currently will not handle", expr)
 	case *sqlparser.RangeCond:
-		//between a and b
-		//翻译过来其实也是个range查询
-		//fmt.Println("range condition expr", expr)
+		// between a and b
+		// the meaning is equal to range query
 		rangeCond := (*expr).(*sqlparser.RangeCond)
-		//fmt.Printf("%#v\n", rangeCond)
 		colName, ok := rangeCond.Left.(*sqlparser.ColName)
 
 		if !ok {
@@ -183,7 +170,6 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 	case *sqlparser.ParenBoolExpr:
 		parentBoolExpr := (*expr).(*sqlparser.ParenBoolExpr)
 		boolExpr := parentBoolExpr.Expr
-		//fmt.Printf("%#v\n", boolExpr)
 		return handleSelectWhere(&boolExpr, false, parent)
 	case *sqlparser.NotExpr:
 		fmt.Println("not expr, todo handle")

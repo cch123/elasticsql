@@ -13,11 +13,11 @@ Currently support:
 [x]lte(<=) support
 [x]sql in (eg. id in (1,2,3) ) expression
 [x]paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
-[x]sql like expression
+[x]sql like expression (currently use match phrase, perhaps will change to wildcard in the future)
 [ ]sql not like expression
 [ ]null check expression(is null/is not null)
 [ ]join expression
-[ ]aggregation like count(*)/group by/having support
+[ ]aggregation like count(*), min(field), max(field), avg(field)/group by/having support
 ```
 
 *Improve : now the query DSL is much more flat*
