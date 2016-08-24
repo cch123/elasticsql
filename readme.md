@@ -91,3 +91,9 @@ will produce :
     "size": 10
 }
 ```
+
+##Warning
+To use this tool, you need to understand the term and match phrase of elasticsearch.
+
+Setting a field to analyzed or not analyzed will get different result.
+
