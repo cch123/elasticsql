@@ -1,0 +1,27 @@
+{
+	"ImportPath": "cch/elasticsql",
+	"GoVersion": "go1.7",
+	"GodepVersion": "v74",
+	"Deps": [
+		{
+			"ImportPath": "github.com/xwb1989/sqlparser",
+			"Rev": "dbfc8580724c42e86a20e9586b75a65b806cd88b"
+		},
+		{
+			"ImportPath": "github.com/xwb1989/sqlparser/dependency/bson",
+			"Rev": "dbfc8580724c42e86a20e9586b75a65b806cd88b"
+		},
+		{
+			"ImportPath": "github.com/xwb1989/sqlparser/dependency/bytes2",
+			"Rev": "dbfc8580724c42e86a20e9586b75a65b806cd88b"
+		},
+		{
+			"ImportPath": "github.com/xwb1989/sqlparser/dependency/hack",
+			"Rev": "dbfc8580724c42e86a20e9586b75a65b806cd88b"
+		},
+		{
+			"ImportPath": "github.com/xwb1989/sqlparser/dependency/sqltypes",
+			"Rev": "dbfc8580724c42e86a20e9586b75a65b806cd88b"
+		}
+	]
+}
