@@ -39,6 +39,7 @@ var sqlArr = []string{
 	//	"select occupy from ark_callcenter where a is not   null",
 	"select occupy from ark_callcenter where a =1 and b = 2 and c=3",
 	"select occupy from ark_callcenter where create_time between '2015-01-01 00:00:00' and '2014-02-02 00:00:00'",
+	"select x from ark where a like '%a%'",
 }
 
 func TestSelect(t *testing.T) {
@@ -52,7 +53,7 @@ func TestSelect(t *testing.T) {
 		//sql valid, start to handle
 		switch stmt.(type) {
 		case *sqlparser.Select:
-			handleSelect(stmt.(*sqlparser.Select))
+			_ = handleSelect(stmt.(*sqlparser.Select))
 		case *sqlparser.Update:
 			t.Error("select handler cannot handle update")
 		case *sqlparser.Insert:

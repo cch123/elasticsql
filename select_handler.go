@@ -140,6 +140,10 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 			resultStr = fmt.Sprintf(`{"terms" : {"%v" : [%v]}}`, colNameStr, rightStr)
 		case "like":
+			rightStr = strings.Replace(rightStr, `%`, ``, -1)
+			//fmt.Println(colNameStr, rightStr)
+			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
+
 		case "not like":
 		}
 
