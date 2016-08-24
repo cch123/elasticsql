@@ -29,7 +29,7 @@ func handleSelect(sel *sqlparser.Select) string {
 	var orderByArr []string
 	orderByStr := ""
 	for _, orderByExpr := range sel.OrderBy {
-		orderByStr = fmt.Sprintf(`{"%v", "%v"}`, sqlparser.String(orderByExpr.Expr), orderByExpr.Direction)
+		orderByStr = fmt.Sprintf(`{"%v": "%v"}`, sqlparser.String(orderByExpr.Expr), orderByExpr.Direction)
 		orderByArr = append(orderByArr, orderByStr)
 	}
 
