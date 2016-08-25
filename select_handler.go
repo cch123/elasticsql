@@ -1,13 +1,14 @@
 package elasticsql
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
 	"github.com/xwb1989/sqlparser"
 )
 
-func handleSelect(sel *sqlparser.Select) string {
+func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) {
 
 	// 顶层节点需要传一个空接口进去，用以判断父结点类型
 	// 有没有更好的写法呢
@@ -19,6 +20,10 @@ func handleSelect(sel *sqlparser.Select) string {
 	//for i, fromExpr := range sel.From {
 	//	fmt.Printf("the %d of from is %#v\n", i, sqlparser.String(fromExpr))
 	//}
+	if len(sel.From) != 1 {
+		return "", "", errors.New("multiple from currently not supported")
+	}
+	esType = sqlparser.String(sel.From)
 
 	queryFrom, querySize := "0", "1"
 
@@ -50,9 +55,8 @@ func handleSelect(sel *sqlparser.Select) string {
 		resultArr = append(resultArr, fmt.Sprintf(`"%v" : %v`, key, val))
 	}
 
-	resultStr := "{" + strings.Join(resultArr, ",") + "}"
-
-	return resultStr
+	dsl = "{" + strings.Join(resultArr, ",") + "}"
+	return dsl, esType, nil
 
 }
 

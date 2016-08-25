@@ -1,3 +1,5 @@
+##Overview
+
 This tool converts sql to elasticsearch dsl
 
 Currently support:
@@ -37,8 +39,9 @@ import (
 )
 
 func main() {
-    res, _ := elasticsql.Convert("select * from aaa where a=1 and x = '三个男人' and create_time between '2015-01-01T00:00:00+0800' and '2016-01-01T00:00:00+0800' and process_id > 1 order by id desc limit 100,10")
-    fmt.Println(res)
+    dsl, esType, _ := elasticsql.Convert("select * from aaa where a=1 and x = '三个男人' and create_time between '2015-01-01T00:00:00+0800' and '2016-01-01T00:00:00+0800' and process_id > 1 order by id desc limit 100,10")
+    fmt.Println(dsl)
+    fmt.Println(esType)
 }
 
 ```
@@ -90,6 +93,8 @@ will produce :
     "from": 100,
     "size": 10
 }
+
+aaa
 ```
 
 ##Warning
