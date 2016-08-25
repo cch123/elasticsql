@@ -23,7 +23,9 @@ func handleSelect(sel *sqlparser.Select) string {
 	queryFrom, querySize := "0", "1"
 
 	if sel.Limit != nil {
-		queryFrom = sqlparser.String(sel.Limit.Offset)
+		if sel.Limit.Offset != nil {
+			queryFrom = sqlparser.String(sel.Limit.Offset)
+		}
 		querySize = sqlparser.String(sel.Limit.Rowcount)
 	}
 
