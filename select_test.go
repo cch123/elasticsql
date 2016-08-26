@@ -53,7 +53,7 @@ func TestSelect(t *testing.T) {
 		//sql valid, start to handle
 		switch stmt.(type) {
 		case *sqlparser.Select:
-			_ = handleSelect(stmt.(*sqlparser.Select))
+			_, _, _ = handleSelect(stmt.(*sqlparser.Select))
 		case *sqlparser.Update:
 			t.Error("select handler cannot handle update")
 		case *sqlparser.Insert:
