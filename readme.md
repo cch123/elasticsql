@@ -16,10 +16,13 @@ Currently support:
 [x]sql in (eg. id in (1,2,3) ) expression
 [x]paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
 [x]sql like expression (currently use match phrase, perhaps will change to wildcard in the future)
+[x]sql order by support
+[x]sql limit support
 [ ]sql not like expression
 [ ]null check expression(is null/is not null)
 [ ]join expression
-[ ]aggregation like count(*), min(field), max(field), avg(field)/group by/having support
+[x]aggregation like count(*), count(field), min(field), max(field), avg(field)/group by support
+[ ]having support
 ```
 
 *Improve : now the query DSL is much more flat*
@@ -102,3 +105,5 @@ To use this tool, you need to understand the term and match phrase of elasticsea
 
 Setting a field to analyzed or not analyzed will get different result.
 
+##Limitation
+Currently only support single index query, join query is not supported.
