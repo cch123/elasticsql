@@ -12,11 +12,12 @@ import (
 func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) {
 
 	// Handle where
-	// 顶层节点需要传一个空接口进去，用以判断父结点类型
-	// 有没有更好的写法呢
+	// top level node pass in an empty interface
+	// to tell the children this is root
+	// is there any better way?
 	var rootParent sqlparser.BoolExpr
 	var queryMap = `{"bool" : {"must": [{"match_all" : {}}]}}`
-	//用户也有可能不传where条件
+	// use may not pass where clauses
 	if sel.Where != nil {
 		queryMap = handleSelectWhere(&sel.Where.Expr, true, &rootParent)
 	}
@@ -35,12 +36,9 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	queryFrom, querySize := "0", "1"
 
 	aggFlag := false
-	//if the request is to aggregation
-	//then set aggFlag to true, and querySize to 0
-	//to not return any query result
-	//fmt.Printf("%#v\n", sel.GroupBy)
-	//fmt.Printf("%#v\n", sel.SelectExprs)
-	//fmt.Printf("%#v\n", len(sel.SelectExprs))
+	// if the request is to aggregation
+	// then set aggFlag to true, and querySize to 0
+	// to not return any query result
 
 	var aggStr string
 	var aggBuildErr error
@@ -53,7 +51,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 		}
 	}
 
-	//Handle limit
+	// Handle limit
 	if sel.Limit != nil {
 		if sel.Limit.Offset != nil {
 			queryFrom = sqlparser.String(sel.Limit.Offset)
@@ -61,8 +59,8 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 		querySize = sqlparser.String(sel.Limit.Rowcount)
 	}
 
-	//Handle order by
-	//when executating aggregations, order by is useless
+	// Handle order by
+	// when executating aggregations, order by is useless
 	var orderByArr []string
 	if aggFlag == false {
 		for _, orderByExpr := range sel.OrderBy {
@@ -92,15 +90,9 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	return dsl, esType, nil
 }
 
-//TODO handle group by count having etc.
-//for i, groupByExpr := range sel.GroupBy {
-//	fmt.Printf("the %d of group by is %#v\n", i, sqlparser.String(groupByExpr))
-//}
-
 func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) string {
-	//没有where条件
 	if expr == nil {
-		fmt.Println("error")
+		//fmt.Println("error")
 		return ""
 	}
 
@@ -174,7 +166,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		case "not like":
 		}
 
-		//如果是root的话，需要加上query/bool和must
+		// the root node need to have bool and must
 		if topLevel {
 			resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
 		}
@@ -215,13 +207,12 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 	return ""
 }
 
-//从select里获取聚集函数
+// extract func expressions from select exprs
 func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr, error) {
 	var res []*sqlparser.FuncExpr
 	for _, v := range sqlSelect {
-		//fmt.Printf("%#v\n", v)
-		//fmt.Printf("%#v\n", sqlparser.String(v))
-		//non star expressioin means column name, or some aggregation functions
+		// non star expressioin means column name
+		// or some aggregation functions
 		expr, ok := v.(*sqlparser.NonStarExpr)
 		if !ok {
 			// no need to handle
@@ -229,21 +220,13 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 		}
 
 		// NonStarExpr start
-		//fmt.Printf("%#v\n", sqlparser.String(expr.Expr))
 
 		switch expr.Expr.(type) {
 		case *sqlparser.FuncExpr:
-			//fmt.Printf("%#v\n", funcExpr)
-			// count(*)，这里拿到的是*
-			// count(id)，这里拿到的是id
-			//fmt.Printf("%#v\n", sqlparser.String(funcExpr.Exprs))
-			//count/sum/min/avg/max
-			//fmt.Printf("%#v\n", string(funcExpr.Name))
 			funcExpr := expr.Expr.(*sqlparser.FuncExpr)
 			res = append(res, funcExpr)
 
 		case *sqlparser.ColName:
-			//fmt.Printf("colname : %#v\n", colName.Name)
 			continue
 		default:
 			fmt.Println("column not supported", sqlparser.String(expr.Expr))
@@ -255,21 +238,15 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 	return res, nil
 }
 
-//从group by里获取bucket
+// extract colnames from group by
 func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, error) {
 	var res []*sqlparser.ColName
 	for _, v := range sqlGroupBy {
 		switch v.(type) {
 		case *sqlparser.ColName:
-			//fmt.Println("col name")
 			colName := v.(*sqlparser.ColName)
 			res = append(res, colName)
-			//fmt.Println(string(colName.Name))
 		case *sqlparser.FuncExpr:
-			//fmt.Println("func expression")
-			//funcExpr := v.(*sqlparser.FuncExpr)
-			//fmt.Println(string(funcExpr.Name))
-			//return nil, errors.New("group by aggregation function not supported")
 			continue
 		}
 	}
@@ -277,11 +254,8 @@ func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, er
 }
 
 func buildAggs(sel *sqlparser.Select) (string, error) {
-	//聚集操作
-	//先用列做出外层的aggregation
+	//the outer agg tree is built with the normal field extracted from group by
 	colNameArr, colErr := handleSelectGroupBy(sel.GroupBy)
-	//fmt.Printf("%#v\n", colNameArr)
-	//fmt.Printf("%#v\n", len(colNameArr))
 
 	var aggMap = make(map[string]interface{})
 	// point to the parent map value
@@ -308,10 +282,7 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		}
 	}
 
-	// 然后用agg函数，做出最内层的aggregation
 	funcExprArr, funcErr := handleSelectSelect(sel.SelectExprs)
-	//fmt.Printf("%#v\n", funcExprArr)
-	//fmt.Printf("%#v\n", len(funcExprArr))
 
 	// the final parentNode is the exact node
 	// to nest the aggreagation functions
@@ -321,12 +292,12 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 	parentNode = &innerAggMap
 
 	for _, v := range funcExprArr {
-		//继续使用parentNode
+		//func expressions will use the same parent bucket
 
 		aggName := strings.ToUpper(string(v.Name)) + `(` + sqlparser.String(v.Exprs) + `)`
 		switch string(v.Name) {
 		case "count":
-			//count需要区分是*还是普通的字段名
+			//count need to distingush * and normal field name
 			if sqlparser.String(v.Exprs) == "*" {
 				(*parentNode)[aggName] = map[string]interface{}{
 					"value_count": map[string]string{
@@ -349,7 +320,7 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		}
 
 	}
-	//	fmt.Println(aggMap)
+
 	mapJSON, _ := json.Marshal(aggMap)
 
 	if colErr == nil && funcErr == nil {
