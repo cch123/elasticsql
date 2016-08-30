@@ -21,7 +21,8 @@ Currently support:
 [ ]sql not like expression
 [ ]null check expression(is null/is not null)
 [ ]join expression
-[ ]aggregation like count(*), min(field), max(field), avg(field)/group by/having support
+[x]aggregation like count(*), count(field), min(field), max(field), avg(field)/group by support
+[ ]having support
 ```
 
 *Improve : now the query DSL is much more flat*
@@ -104,3 +105,5 @@ To use this tool, you need to understand the term and match phrase of elasticsea
 
 Setting a field to analyzed or not analyzed will get different result.
 
+##Limitation
+Currently only support single index query, join query is not supported.

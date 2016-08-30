@@ -1,6 +1,7 @@
 package elasticsql
 
 import (
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -41,27 +42,15 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	//fmt.Printf("%#v\n", sel.SelectExprs)
 	//fmt.Printf("%#v\n", len(sel.SelectExprs))
 
+	var aggStr string
+	var aggBuildErr error
 	if len(sel.GroupBy) > 0 {
 		aggFlag = true
 		querySize = "0"
-
-		//聚集操作
-		//先用列做出外层的aggregation
-		colNameArr, err := handleSelectGroupBy(sel.GroupBy)
-		fmt.Printf("%#v\n", colNameArr)
-		fmt.Printf("%#v\n", len(colNameArr))
-		if err != nil {
-			//TODO
+		aggStr, aggBuildErr = buildAggs(sel)
+		if aggBuildErr != nil {
+			aggStr = ""
 		}
-
-		//然后用agg函数，做出最内层的aggregation
-		funcExprArr, err := handleSelectSelect(sel.SelectExprs)
-		fmt.Printf("%#v\n", funcExprArr)
-		fmt.Printf("%#v\n", len(funcExprArr))
-		if err != nil {
-			//TODO
-		}
-
 	}
 
 	//Handle limit
@@ -86,6 +75,9 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	resultMap["query"] = queryMap
 	resultMap["from"] = queryFrom
 	resultMap["size"] = querySize
+	if len(aggStr) > 0 {
+		resultMap["aggregations"] = aggStr
+	}
 
 	if len(orderByArr) > 0 {
 		resultMap["sort"] = fmt.Sprintf("[%v]", strings.Join(orderByArr, ","))
@@ -284,5 +276,84 @@ func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, er
 	return res, nil
 }
 
-func buildAggs(cols []*sqlparser.ColName, aggFuncs []*sqlparser.FuncExpr) {
+func buildAggs(sel *sqlparser.Select) (string, error) {
+	//聚集操作
+	//先用列做出外层的aggregation
+	colNameArr, colErr := handleSelectGroupBy(sel.GroupBy)
+	//fmt.Printf("%#v\n", colNameArr)
+	//fmt.Printf("%#v\n", len(colNameArr))
+
+	var aggMap = make(map[string]interface{})
+	// point to the parent map value
+	var parentNode *map[string]interface{}
+	for idx, v := range colNameArr {
+		if idx == 0 {
+			innerMap := make(map[string]interface{})
+			innerMap["terms"] = map[string]interface{}{
+				"field": string(v.Name),
+				"size":  200,
+			}
+			aggMap[string(v.Name)] = innerMap
+			parentNode = &innerMap
+		} else {
+			innerMap := make(map[string]interface{})
+			innerMap["terms"] = map[string]interface{}{
+				"field": string(v.Name),
+				"size":  0,
+			}
+			(*parentNode)["aggregations"] = map[string]interface{}{
+				string(v.Name): innerMap,
+			}
+			parentNode = &innerMap
+		}
+	}
+
+	// 然后用agg函数，做出最内层的aggregation
+	funcExprArr, funcErr := handleSelectSelect(sel.SelectExprs)
+	//fmt.Printf("%#v\n", funcExprArr)
+	//fmt.Printf("%#v\n", len(funcExprArr))
+
+	// the final parentNode is the exact node
+	// to nest the aggreagation functions
+	// but v in loop all use the same parentNode
+	var innerAggMap = make(map[string]interface{})
+	(*parentNode)["aggregations"] = innerAggMap
+	parentNode = &innerAggMap
+
+	for _, v := range funcExprArr {
+		//继续使用parentNode
+
+		aggName := strings.ToUpper(string(v.Name)) + `(` + sqlparser.String(v.Exprs) + `)`
+		switch string(v.Name) {
+		case "count":
+			//count需要区分是*还是普通的字段名
+			if sqlparser.String(v.Exprs) == "*" {
+				(*parentNode)[aggName] = map[string]interface{}{
+					"value_count": map[string]string{
+						"field": "_index",
+					},
+				}
+			} else {
+				(*parentNode)[aggName] = map[string]interface{}{
+					"value_count": map[string]string{
+						"field": sqlparser.String(v.Exprs),
+					},
+				}
+			}
+		default:
+			(*parentNode)[aggName] = map[string]interface{}{
+				string(v.Name): map[string]string{
+					"field": sqlparser.String(v.Exprs),
+				},
+			}
+		}
+
+	}
+	//	fmt.Println(aggMap)
+	mapJSON, _ := json.Marshal(aggMap)
+
+	if colErr == nil && funcErr == nil {
+	}
+
+	return string(mapJSON), nil
 }
