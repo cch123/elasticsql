@@ -19,7 +19,10 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	var queryMap = `{"bool" : {"must": [{"match_all" : {}}]}}`
 	// use may not pass where clauses
 	if sel.Where != nil {
-		queryMap = handleSelectWhere(&sel.Where.Expr, true, &rootParent)
+		queryMap, err = handleSelectWhere(&sel.Where.Expr, true, &rootParent)
+		if err != nil {
+			return "", "", err
+		}
 	}
 
 	//TODO support multiple tables
@@ -41,13 +44,13 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	// to not return any query result
 
 	var aggStr string
-	var aggBuildErr error
 	if len(sel.GroupBy) > 0 {
 		aggFlag = true
 		querySize = "0"
-		aggStr, aggBuildErr = buildAggs(sel)
-		if aggBuildErr != nil {
-			aggStr = ""
+		aggStr, err = buildAggs(sel)
+		if err != nil {
+			//aggStr = ""
+			return "", "", err
 		}
 	}
 
@@ -90,10 +93,9 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	return dsl, esType, nil
 }
 
-func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) string {
+func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
 	if expr == nil {
-		//fmt.Println("error")
-		return ""
+		return "", errors.New("error expression cannot be nil here")
 	}
 
 	switch (*expr).(type) {
@@ -101,37 +103,50 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		andExpr := (*expr).(*sqlparser.AndExpr)
 		leftExpr := andExpr.Left
 		rightExpr := andExpr.Right
-		leftStr := handleSelectWhere(&leftExpr, false, expr)
-		rightStr := handleSelectWhere(&rightExpr, false, expr)
+		leftStr, err := handleSelectWhere(&leftExpr, false, expr)
+		if err != nil {
+			return "", err
+		}
+		rightStr, err := handleSelectWhere(&rightExpr, false, expr)
+		if err != nil {
+			return "", err
+		}
 
 		// not toplevel
 		// if the parent node is also and, then the result can be merged
 		if _, ok := (*parent).(*sqlparser.AndExpr); ok {
-			return leftStr + `,` + rightStr
+			return leftStr + `,` + rightStr, nil
 		}
 
-		return fmt.Sprintf(`{"bool" : {"must" : [%v, %v]}}`, leftStr, rightStr)
+		return fmt.Sprintf(`{"bool" : {"must" : [%v, %v]}}`, leftStr, rightStr), nil
 	case *sqlparser.OrExpr:
 		orExpr := (*expr).(*sqlparser.OrExpr)
 		leftExpr := orExpr.Left
 		rightExpr := orExpr.Right
-		leftStr := handleSelectWhere(&leftExpr, false, expr)
-		rightStr := handleSelectWhere(&rightExpr, false, expr)
+
+		leftStr, err := handleSelectWhere(&leftExpr, false, expr)
+		if err != nil {
+			return "", err
+		}
+
+		rightStr, err := handleSelectWhere(&rightExpr, false, expr)
+		if err != nil {
+			return "", err
+		}
 
 		// not toplevel
 		// if the parent node is also or node, then merge the query param
 		if _, ok := (*parent).(*sqlparser.OrExpr); ok {
-			return leftStr + `,` + rightStr
+			return leftStr + `,` + rightStr, nil
 		}
 
-		return fmt.Sprintf(`{"bool" : {"should" : [%v, %v]}}`, leftStr, rightStr)
+		return fmt.Sprintf(`{"bool" : {"should" : [%v, %v]}}`, leftStr, rightStr), nil
 	case *sqlparser.ComparisonExpr:
 		comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
 		colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
 
 		if !ok {
-			fmt.Println("invalid comparison expr")
-			return ""
+			return "", errors.New("invalid comparison expression, the left must be a column name")
 		}
 
 		colNameStr := sqlparser.String(colName)
@@ -164,6 +179,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			rightStr = strings.Replace(rightStr, `%`, ``, -1)
 			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
 		case "not like":
+			return "", errors.New("not like currently not supported")
 		}
 
 		// the root node need to have bool and must
@@ -171,10 +187,10 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
 		}
 
-		return resultStr
+		return resultStr, nil
 
 	case *sqlparser.NullCheck:
-		fmt.Println("null check expr, currently will not handle", expr)
+		return "", errors.New("null check expression currently not supported")
 	case *sqlparser.RangeCond:
 		// between a and b
 		// the meaning is equal to range query
@@ -182,8 +198,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		colName, ok := rangeCond.Left.(*sqlparser.ColName)
 
 		if !ok {
-			fmt.Println("range column name missing")
-			return ""
+			return "", errors.New("range column name missing")
 		}
 
 		colNameStr := sqlparser.String(colName)
@@ -195,16 +210,17 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
 		}
 
-		return resultStr
+		return resultStr, nil
 
 	case *sqlparser.ParenBoolExpr:
 		parentBoolExpr := (*expr).(*sqlparser.ParenBoolExpr)
 		boolExpr := parentBoolExpr.Expr
 		return handleSelectWhere(&boolExpr, false, parent)
 	case *sqlparser.NotExpr:
-		fmt.Println("not expr, todo handle")
+		return "", errors.New("not expression currently not supported")
 	}
-	return ""
+
+	return "", errors.New("logically cannot reached here")
 }
 
 // extract func expressions from select exprs
