@@ -16,10 +16,15 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	// to tell the children this is root
 	// is there any better way?
 	var rootParent sqlparser.BoolExpr
-	var queryMap = `{"bool" : {"must": [{"match_all" : {}}]}}`
+	var defaultQueryMapStr = `{"bool" : {"must": [{"match_all" : {}}]}}`
+	var queryMapStr string
+
 	// use may not pass where clauses
 	if sel.Where != nil {
-		queryMap = handleSelectWhere(&sel.Where.Expr, true, &rootParent)
+		queryMapStr = handleSelectWhere(&sel.Where.Expr, true, &rootParent)
+		if queryMapStr == "" {
+			queryMapStr = defaultQueryMapStr
+		}
 	}
 
 	//TODO support multiple tables
@@ -70,7 +75,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	}
 
 	resultMap := make(map[string]interface{})
-	resultMap["query"] = queryMap
+	resultMap["query"] = queryMapStr
 	resultMap["from"] = queryFrom
 	resultMap["size"] = querySize
 	if len(aggStr) > 0 {
@@ -106,11 +111,20 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 		// not toplevel
 		// if the parent node is also and, then the result can be merged
-		if _, ok := (*parent).(*sqlparser.AndExpr); ok {
-			return leftStr + `,` + rightStr
+		//fmt.Println("left is "+leftStr, "right is "+rightStr)
+
+		var resultStr string
+		if leftStr == "" || rightStr == "" {
+			resultStr = leftStr + rightStr
+		} else {
+			resultStr = leftStr + `,` + rightStr
 		}
 
-		return fmt.Sprintf(`{"bool" : {"must" : [%v, %v]}}`, leftStr, rightStr)
+		if _, ok := (*parent).(*sqlparser.AndExpr); ok {
+			return resultStr
+		}
+
+		return fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
 	case *sqlparser.OrExpr:
 		orExpr := (*expr).(*sqlparser.OrExpr)
 		leftExpr := orExpr.Left
@@ -118,19 +132,26 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		leftStr := handleSelectWhere(&leftExpr, false, expr)
 		rightStr := handleSelectWhere(&rightExpr, false, expr)
 
+		var resultStr string
+		if leftStr == "" || rightStr == "" {
+			resultStr = leftStr + rightStr
+		} else {
+			resultStr = leftStr + `,` + rightStr
+		}
+
 		// not toplevel
 		// if the parent node is also or node, then merge the query param
 		if _, ok := (*parent).(*sqlparser.OrExpr); ok {
-			return leftStr + `,` + rightStr
+			return resultStr
 		}
 
-		return fmt.Sprintf(`{"bool" : {"should" : [%v, %v]}}`, leftStr, rightStr)
+		return fmt.Sprintf(`{"bool" : {"should" : [%v]}}`, resultStr)
 	case *sqlparser.ComparisonExpr:
 		comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
 		colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
 
 		if !ok {
-			fmt.Println("invalid comparison expr")
+			fmt.Println("error, left of comparison expression must be column name")
 			return ""
 		}
 
