@@ -89,9 +89,13 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 		resultMap["sort"] = fmt.Sprintf("[%v]", strings.Join(orderByArr, ","))
 	}
 
+	// keep the travesal in order, avoid unpredicted json
+	var keySlice = []string{"query", "from", "size", "sort", "aggregation"}
 	var resultArr []string
-	for key, val := range resultMap {
-		resultArr = append(resultArr, fmt.Sprintf(`"%v" : %v`, key, val))
+	for _, mapKey := range keySlice {
+		if val, ok := resultMap[mapKey]; ok {
+			resultArr = append(resultArr, fmt.Sprintf(`"%v" : %v`, mapKey, val))
+		}
 	}
 
 	dsl = "{" + strings.Join(resultArr, ",") + "}"
