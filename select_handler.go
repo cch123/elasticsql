@@ -25,9 +25,9 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 		if err != nil {
 			return "", "", err
 		}
-		if queryMapStr == "" {
-			queryMapStr = defaultQueryMapStr
-		}
+	}
+	if queryMapStr == "" {
+		queryMapStr = defaultQueryMapStr
 	}
 
 	//TODO support multiple tables
