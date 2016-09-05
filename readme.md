@@ -6,26 +6,24 @@ This tool converts sql to elasticsearch dsl
 
 Currently support:
 
-```
-[x]sql and expression
-[x]sql or expression
-[x]equal(=) support
-[x]not equal(!=) support
-[x]gt(>) support
-[x]gte(>=) support
-[x]lt(<) support
-[x]lte(<=) support
-[x]sql in (eg. id in (1,2,3) ) expression
-[x]paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
-[x]sql like expression (currently use match phrase, perhaps will change to wildcard in the future)
-[x]sql order by support
-[x]sql limit support
-[ ]sql not like expression
-[ ]null check expression(is null/is not null)
-[ ]join expression
-[x]aggregation like count(*), count(field), min(field), max(field), avg(field)/group by support
-[ ]having support
-```
+- [x] sql and expression
+- [x] sql or expression
+- [x] equal(=) support
+- [x] not equal(!=) support
+- [x] gt(>) support
+- [x] gte(>=) support
+- [x] lt(<) support
+- [x] lte(<=) support
+- [x] sql in (eg. id in (1,2,3) ) expression
+- [x] paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
+- [x] sql like expression (currently use match phrase, perhaps will change to wildcard in the future)
+- [x] sql order by support
+- [x] sql limit support
+- [ ] sql not like expression
+- [ ] null check expression(is null/is not null)
+- [ ] join expression
+- [x] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
+- [ ] having support
 
 *Improve : now the query DSL is much more flat*
 
@@ -114,5 +112,3 @@ To use this tool, you need to understand the term and match phrase of elasticsea
 
 Setting a field to analyzed or not analyzed will get different result.
 
-##Limitation
-Currently only support single index query, join query is not supported.
