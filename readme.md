@@ -112,3 +112,5 @@ To use this tool, you need to understand the term and match phrase of elasticsea
 
 Setting a field to analyzed or not analyzed will get different result.
 
+##Details
+For more details of convertion, please refer to the [wiki](https://github.com/cch123/elasticsql/wiki)
