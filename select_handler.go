@@ -90,7 +90,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	}
 
 	// keep the travesal in order, avoid unpredicted json
-	var keySlice = []string{"query", "from", "size", "sort", "aggregation"}
+	var keySlice = []string{"query", "from", "size", "sort", "aggregations"}
 	var resultArr []string
 	for _, mapKey := range keySlice {
 		if val, ok := resultMap[mapKey]; ok {
