@@ -1,6 +1,11 @@
 package elasticsql
 
-import "github.com/xwb1989/sqlparser"
+import (
+	"errors"
 
-func handleUpdate(upd *sqlparser.Update) {
+	"github.com/xwb1989/sqlparser"
+)
+
+func handleUpdate(upd *sqlparser.Update) (string, string, error) {
+	return "", "", errors.New("update not supported")
 }

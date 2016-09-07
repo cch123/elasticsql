@@ -19,11 +19,11 @@ func Convert(sql string) (dsl string, table string, err error) {
 	case *sqlparser.Select:
 		dsl, table, err = handleSelect(stmt.(*sqlparser.Select))
 	case *sqlparser.Update:
-		return "", "", errors.New("update not supported")
+		return handleUpdate(stmt.(*sqlparser.Update))
 	case *sqlparser.Insert:
-		return "", "", errors.New("insert not supported")
+		return handleInsert(stmt.(*sqlparser.Insert))
 	case *sqlparser.Delete:
-		return "", "", errors.New("delete not supported")
+		return handleDelete(stmt.(*sqlparser.Delete))
 	}
 
 	if err != nil {

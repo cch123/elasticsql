@@ -1,6 +1,11 @@
 package elasticsql
 
-import "github.com/xwb1989/sqlparser"
+import (
+	"errors"
 
-func handleDelete(del *sqlparser.Delete) {
+	"github.com/xwb1989/sqlparser"
+)
+
+func handleDelete(del *sqlparser.Delete) (string, string, error) {
+	return "", "", errors.New("delete not supported")
 }
