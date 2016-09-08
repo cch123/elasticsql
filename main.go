@@ -1,17 +1,13 @@
 package elasticsql
 
-import (
-	"errors"
-
-	"github.com/xwb1989/sqlparser"
-)
+import "github.com/xwb1989/sqlparser"
 
 // Convert will transform sql to elasticsearch dsl string
 func Convert(sql string) (dsl string, table string, err error) {
 	stmt, err := sqlparser.Parse(sql)
 
 	if err != nil {
-		return "", "", errors.New("parse error")
+		return "", "", err
 	}
 
 	//sql valid, start to handle
