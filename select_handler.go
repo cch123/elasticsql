@@ -52,6 +52,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	if len(sel.GroupBy) > 0 {
 		aggFlag = true
 		querySize = "0"
+		fmt.Printf("%#v\n", sel.GroupBy)
 		aggStr, err = buildAggs(sel)
 		if err != nil {
 			//aggStr = ""
@@ -288,6 +289,13 @@ func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, er
 			colName := v.(*sqlparser.ColName)
 			res = append(res, colName)
 		case *sqlparser.FuncExpr:
+			funcExpr := v.(*sqlparser.FuncExpr)
+			fmt.Printf("%#v\n", funcExpr)
+			//if funcExpr.Name == "date_histogram"
+			fmt.Printf("%#v\n", funcExpr.Exprs)
+			for _, v := range funcExpr.Exprs {
+				fmt.Printf("%#v\n", v)
+			}
 			continue
 		}
 	}
