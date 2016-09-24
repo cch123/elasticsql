@@ -250,14 +250,15 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 }
 
 // extract func expressions from select exprs
-func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr, error) {
-	var res []*sqlparser.FuncExpr
+func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr, []*sqlparser.ColName, error) {
+	var colArr []*sqlparser.ColName
+	var funcArr []*sqlparser.FuncExpr
 	for _, v := range sqlSelect {
 		// non star expressioin means column name
 		// or some aggregation functions
 		expr, ok := v.(*sqlparser.NonStarExpr)
 		if !ok {
-			// no need to handle
+			// no need to handle, star expression * just skip is ok
 			continue
 		}
 
@@ -266,7 +267,7 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 		switch expr.Expr.(type) {
 		case *sqlparser.FuncExpr:
 			funcExpr := expr.Expr.(*sqlparser.FuncExpr)
-			res = append(res, funcExpr)
+			funcArr = append(funcArr, funcExpr)
 
 		case *sqlparser.ColName:
 			continue
@@ -277,17 +278,18 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 		//starExpression like *, table.* should be ignored
 		//'cause it is meaningless to set fields in elasticsearch aggs
 	}
-	return res, nil
+	return funcArr, colArr, nil
 }
 
 // extract colnames from group by
-func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, error) {
-	var res []*sqlparser.ColName
+func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.FuncExpr, []*sqlparser.ColName, error) {
+	var colArr []*sqlparser.ColName
+	var funcArr []*sqlparser.FuncExpr
 	for _, v := range sqlGroupBy {
 		switch v.(type) {
 		case *sqlparser.ColName:
 			colName := v.(*sqlparser.ColName)
-			res = append(res, colName)
+			colArr = append(colArr, colName)
 		case *sqlparser.FuncExpr:
 			funcExpr := v.(*sqlparser.FuncExpr)
 			fmt.Printf("%#v\n", funcExpr)
@@ -296,49 +298,81 @@ func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.ColName, er
 			for _, v := range funcExpr.Exprs {
 				fmt.Printf("%#v\n", v)
 			}
-			continue
+			funcArr = append(funcArr, funcExpr)
 		}
 	}
-	return res, nil
+	return funcArr, colArr, nil
 }
 
+// this function becomes too complicated, need refactor
 func buildAggs(sel *sqlparser.Select) (string, error) {
 	//the outer agg tree is built with the normal field extracted from group by
-	colNameArr, colErr := handleSelectGroupBy(sel.GroupBy)
+	//_, colNameArr, colErr := handleSelectGroupBy(sel.GroupBy)
 
 	var aggMap = make(map[string]interface{})
 	// point to the parent map value
 	var parentNode *map[string]interface{}
-	for idx, v := range colNameArr {
-		if idx == 0 {
-			innerMap := make(map[string]interface{})
-			innerMap["terms"] = map[string]interface{}{
-				"field": string(v.Name),
-				"size":  200,
+	//for idx, v := range colNameArr {
+	for idx, v := range sel.GroupBy {
+		switch v.(type) {
+		case *sqlparser.ColName:
+			colName := v.(*sqlparser.ColName)
+			if idx == 0 {
+				innerMap := make(map[string]interface{})
+				innerMap["terms"] = map[string]interface{}{
+					"field": string(colName.Name),
+					"size":  200, // this size may need to change ?
+				}
+				aggMap[string(colName.Name)] = innerMap
+				parentNode = &innerMap
+			} else {
+				innerMap := make(map[string]interface{})
+				innerMap["terms"] = map[string]interface{}{
+					"field": string(colName.Name),
+					"size":  0,
+				}
+				(*parentNode)["aggregations"] = map[string]interface{}{
+					string(colName.Name): innerMap,
+				}
+				parentNode = &innerMap
 			}
-			aggMap[string(v.Name)] = innerMap
-			parentNode = &innerMap
-		} else {
-			innerMap := make(map[string]interface{})
-			innerMap["terms"] = map[string]interface{}{
-				"field": string(v.Name),
-				"size":  0,
+		case *sqlparser.FuncExpr:
+			funcExpr := v.(*sqlparser.FuncExpr)
+			// only handle the needed
+			var field, internal, format string
+			//fmt.Println(string(funcExpr.Name)) date_histogram
+			if string(funcExpr.Name) == "date_histogram" {
+				innerMap := make(map[string]interface{})
+				//rightStr = strings.Replace(rightStr, `'`, `"`, -1)
+				innerMap["date_histogram"] = map[string]interface{}{
+					"field":    field,
+					"internal": internal,
+					"format":   format,
+				}
+				keyName := sqlparser.String(funcExpr)
+				keyName = strings.Replace(keyName, `'`, ``, -1)
+				keyName = strings.Replace(keyName, ` `, ``, -1)
+				aggMap[keyName] = innerMap
+				parentNode = &innerMap
 			}
-			(*parentNode)["aggregations"] = map[string]interface{}{
-				string(v.Name): innerMap,
-			}
-			parentNode = &innerMap
 		}
 	}
 
-	funcExprArr, funcErr := handleSelectSelect(sel.SelectExprs)
+	funcExprArr, _, funcErr := handleSelectSelect(sel.SelectExprs)
 
 	// the final parentNode is the exact node
 	// to nest the aggreagation functions
 	// but v in loop all use the same parentNode
 	var innerAggMap = make(map[string]interface{})
-	(*parentNode)["aggregations"] = innerAggMap
-	parentNode = &innerAggMap
+	if parentNode == nil {
+		return "", errors.New("agg not supported yet")
+	}
+
+	fmt.Println("oh yes", innerAggMap)
+	if len(innerAggMap) > 0 {
+		(*parentNode)["aggregations"] = innerAggMap
+		parentNode = &innerAggMap
+	}
 
 	for _, v := range funcExprArr {
 		//func expressions will use the same parent bucket
@@ -372,8 +406,10 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 
 	mapJSON, _ := json.Marshal(aggMap)
 
-	if colErr == nil && funcErr == nil {
+	//if colErr == nil && funcErr == nil {
+	if funcErr == nil {
 	}
+	fmt.Println(string(mapJSON))
 
 	return string(mapJSON), nil
 }
