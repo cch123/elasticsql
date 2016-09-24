@@ -45,7 +45,8 @@ var sqlArr = []string{
 	//"select id, count(id), count(*) from ark where d = 1 group by channel, id, process_id",
 	//"SELECT sum(id),count(channel),avg(area_id),min(area_id), max(process_id), channel from g group by channel",
 	"select count(*) from ark group by date_histogram(field='create_time', value='1h')",
-	"select * from ark group by date_histogram(field='create_time', value='1h'),id",
+	"select * from ark group by date_histogram(field='create_time', value='1h')",
+	"select * from ark group by date_histogram(field='create_time', value='1h'), id",
 }
 
 func TestSelect(t *testing.T) {

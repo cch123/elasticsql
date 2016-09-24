@@ -368,12 +368,6 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		return "", errors.New("agg not supported yet")
 	}
 
-	fmt.Println("oh yes", innerAggMap)
-	if len(innerAggMap) > 0 {
-		(*parentNode)["aggregations"] = innerAggMap
-		parentNode = &innerAggMap
-	}
-
 	for _, v := range funcExprArr {
 		//func expressions will use the same parent bucket
 
@@ -382,20 +376,20 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		case "count":
 			//count need to distingush * and normal field name
 			if sqlparser.String(v.Exprs) == "*" {
-				(*parentNode)[aggName] = map[string]interface{}{
+				innerAggMap[aggName] = map[string]interface{}{
 					"value_count": map[string]string{
 						"field": "_index",
 					},
 				}
 			} else {
-				(*parentNode)[aggName] = map[string]interface{}{
+				innerAggMap[aggName] = map[string]interface{}{
 					"value_count": map[string]string{
 						"field": sqlparser.String(v.Exprs),
 					},
 				}
 			}
 		default:
-			(*parentNode)[aggName] = map[string]interface{}{
+			innerAggMap[aggName] = map[string]interface{}{
 				string(v.Name): map[string]string{
 					"field": sqlparser.String(v.Exprs),
 				},
@@ -403,6 +397,12 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		}
 
 	}
+
+	fmt.Println("oh yes", innerAggMap)
+	if len(innerAggMap) > 0 {
+		(*parentNode)["aggregations"] = innerAggMap
+	}
+	//parentNode = &innerAggMap
 
 	mapJSON, _ := json.Marshal(aggMap)
 
