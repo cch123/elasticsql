@@ -40,10 +40,13 @@ var sqlArr = []string{
 	"select occupy from ark_callcenter where a =1 and b = 2 and c=3",
 	"select occupy from ark_callcenter where create_time between '2015-01-01 00:00:00' and '2014-02-02 00:00:00'",
 	"select x from ark where a like '%a%'",
-	"select channel, count(*) as d from ark where d = 1 group by channel, count(*)",
-	"select id, count(*) from ark where d = 1 group by channel, count(*)",
-	"select id, count(id), count(*) from ark where d = 1 group by channel, id, process_id",
-	"SELECT sum(id),count(channel),avg(area_id),min(area_id), max(process_id), channel from g group by channel",
+	//"select channel, count(*) as d from ark where d = 1 group by channel, count(*)",
+	//"select id, count(*) from ark where d = 1 group by channel, count(*)",
+	//"select id, count(id), count(*) from ark where d = 1 group by channel, id, process_id",
+	//"SELECT sum(id),count(channel),avg(area_id),min(area_id), max(process_id), channel from g group by channel",
+	"select count(*) from ark group by date_histogram(field='create_time', value='1h')",
+	"select * from ark group by date_histogram(field='create_time', value='1h')",
+	"select * from ark group by date_histogram(field='create_time', value='1h'), id",
 }
 
 func TestSelect(t *testing.T) {
