@@ -52,7 +52,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	if len(sel.GroupBy) > 0 {
 		aggFlag = true
 		querySize = "0"
-		fmt.Printf("%#v\n", sel.GroupBy)
+		//fmt.Printf("%#v\n", sel.GroupBy)
 		aggStr, err = buildAggs(sel)
 		if err != nil {
 			//aggStr = ""
@@ -281,6 +281,7 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 	return funcArr, colArr, nil
 }
 
+// deprecated
 // extract colnames from group by
 func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.FuncExpr, []*sqlparser.ColName, error) {
 	var colArr []*sqlparser.ColName
@@ -339,14 +340,48 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		case *sqlparser.FuncExpr:
 			funcExpr := v.(*sqlparser.FuncExpr)
 			// only handle the needed
-			var field, internal, format string
+			var field string
+			interval := "1h"
+			format := "yyyy-MM-dd HH:mm:ss"
 			//fmt.Println(string(funcExpr.Name)) date_histogram
 			if string(funcExpr.Name) == "date_histogram" {
 				innerMap := make(map[string]interface{})
 				//rightStr = strings.Replace(rightStr, `'`, `"`, -1)
+
+				//get field/interval and format
+				for _, expr := range funcExpr.Exprs {
+					// the expression in date_histogram must be like a = b format
+					switch expr.(type) {
+					case *sqlparser.NonStarExpr:
+						nonStarExpr := expr.(*sqlparser.NonStarExpr)
+						comparisonExpr, ok := nonStarExpr.Expr.(*sqlparser.ComparisonExpr)
+						if !ok {
+							return "", errors.New("unsupported expression in date_histogram")
+						}
+						left, ok := comparisonExpr.Left.(*sqlparser.ColName)
+						if !ok {
+							return "", errors.New("param error in date_histogram")
+						}
+						rightStr := sqlparser.String(comparisonExpr.Right)
+						rightStr = strings.Replace(rightStr, `'`, ``, -1)
+						if string(left.Name) == "field" {
+							field = rightStr
+						}
+						if string(left.Name) == "interval" {
+							interval = rightStr
+						}
+						if string(left.Name) == "format" {
+							format = rightStr
+						}
+
+					default:
+						return "", errors.New("unsupported expression in date_histogram")
+					}
+				}
+
 				innerMap["date_histogram"] = map[string]interface{}{
 					"field":    field,
-					"internal": internal,
+					"interval": interval,
 					"format":   format,
 				}
 				keyName := sqlparser.String(funcExpr)
@@ -398,18 +433,15 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 
 	}
 
-	fmt.Println("oh yes", innerAggMap)
 	if len(innerAggMap) > 0 {
 		(*parentNode)["aggregations"] = innerAggMap
 	}
-	//parentNode = &innerAggMap
 
 	mapJSON, _ := json.Marshal(aggMap)
 
 	//if colErr == nil && funcErr == nil {
 	if funcErr == nil {
 	}
-	fmt.Println(string(mapJSON))
 
 	return string(mapJSON), nil
 }
