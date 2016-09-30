@@ -114,3 +114,6 @@ Setting a field to analyzed or not analyzed will get different result.
 
 ##Details
 For more details of convertion, please refer to the [wiki](https://github.com/cch123/elasticsql/wiki)
+
+##Other info
+When writing this tool, I tried to avoid the deprecated dsl filters and aggregations, so it is compatable with most versions of the elasticsearch
