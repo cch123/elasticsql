@@ -272,35 +272,12 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 		case *sqlparser.ColName:
 			continue
 		default:
-			fmt.Println("column not supported", sqlparser.String(expr.Expr))
+			//ignore
+			//fmt.Println("column not supported", sqlparser.String(expr.Expr))
 		}
 
 		//starExpression like *, table.* should be ignored
 		//'cause it is meaningless to set fields in elasticsearch aggs
-	}
-	return funcArr, colArr, nil
-}
-
-// deprecated
-// extract colnames from group by
-func handleSelectGroupBy(sqlGroupBy sqlparser.GroupBy) ([]*sqlparser.FuncExpr, []*sqlparser.ColName, error) {
-	var colArr []*sqlparser.ColName
-	var funcArr []*sqlparser.FuncExpr
-	for _, v := range sqlGroupBy {
-		switch v.(type) {
-		case *sqlparser.ColName:
-			colName := v.(*sqlparser.ColName)
-			colArr = append(colArr, colName)
-		case *sqlparser.FuncExpr:
-			funcExpr := v.(*sqlparser.FuncExpr)
-			fmt.Printf("%#v\n", funcExpr)
-			//if funcExpr.Name == "date_histogram"
-			fmt.Printf("%#v\n", funcExpr.Exprs)
-			for _, v := range funcExpr.Exprs {
-				fmt.Printf("%#v\n", v)
-			}
-			funcArr = append(funcArr, funcExpr)
-		}
 	}
 	return funcArr, colArr, nil
 }
