@@ -37,7 +37,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 
 	//Handle from
 	if len(sel.From) != 1 {
-		return "", "", errors.New("multiple from currently not supported")
+		return "", "", errors.New("elasticsql: multiple from currently not supported")
 	}
 	esType = sqlparser.String(sel.From)
 
@@ -113,19 +113,19 @@ func buildNestedFuncStrValue(nestedFunc *sqlparser.FuncExpr) (string, error) {
 				nonStarExpr := nestedExpr.(*sqlparser.NonStarExpr)
 				result += strings.Trim(sqlparser.String(nonStarExpr), `'`)
 			default:
-				return "", errors.New("unsupported expression" + sqlparser.String(nestedExpr))
+				return "", errors.New("elasticsql: unsupported expression" + sqlparser.String(nestedExpr))
 			}
 		}
 		//TODO support more functions
 	default:
-		return "", errors.New("unsupported function" + string(nestedFunc.Name))
+		return "", errors.New("elasticsql: unsupported function" + string(nestedFunc.Name))
 	}
 	return result, nil
 }
 
 func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
 	if expr == nil {
-		return "", errors.New("error expression cannot be nil here")
+		return "", errors.New("elasticsql: error expression cannot be nil here")
 	}
 
 	switch (*expr).(type) {
@@ -192,7 +192,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
 
 		if !ok {
-			return "", errors.New("invalid comparison expression, the left must be a column name")
+			return "", errors.New("elasticsql: invalid comparison expression, the left must be a column name")
 		}
 
 		colNameStr := sqlparser.String(colName)
@@ -210,7 +210,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 				return "", err
 			}
 		case *sqlparser.ColName:
-			return "", errors.New("column name on the right side of compare operator is not supported")
+			return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
 		}
 
 		resultStr := ""
@@ -239,7 +239,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			rightStr = strings.Replace(rightStr, `%`, ``, -1)
 			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
 		case "not like":
-			return "", errors.New("not like currently not supported")
+			return "", errors.New("elasticsql: not like currently not supported")
 		}
 
 		// the root node need to have bool and must
@@ -250,7 +250,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		return resultStr, nil
 
 	case *sqlparser.NullCheck:
-		return "", errors.New("null check expression currently not supported")
+		return "", errors.New("elasticsql: null check expression currently not supported")
 	case *sqlparser.RangeCond:
 		// between a and b
 		// the meaning is equal to range query
@@ -258,7 +258,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		colName, ok := rangeCond.Left.(*sqlparser.ColName)
 
 		if !ok {
-			return "", errors.New("range column name missing")
+			return "", errors.New("elasticsql: range column name missing")
 		}
 
 		colNameStr := sqlparser.String(colName)
@@ -277,10 +277,10 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		boolExpr := parentBoolExpr.Expr
 		return handleSelectWhere(&boolExpr, false, parent)
 	case *sqlparser.NotExpr:
-		return "", errors.New("not expression currently not supported")
+		return "", errors.New("elasticsql: not expression currently not supported")
 	}
 
-	return "", errors.New("logically cannot reached here")
+	return "", errors.New("elaticsql: logically cannot reached here")
 }
 
 // extract func expressions from select exprs
@@ -367,11 +367,11 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 						nonStarExpr := expr.(*sqlparser.NonStarExpr)
 						comparisonExpr, ok := nonStarExpr.Expr.(*sqlparser.ComparisonExpr)
 						if !ok {
-							return "", errors.New("unsupported expression in date_histogram")
+							return "", errors.New("elasticsql: unsupported expression in date_histogram")
 						}
 						left, ok := comparisonExpr.Left.(*sqlparser.ColName)
 						if !ok {
-							return "", errors.New("param error in date_histogram")
+							return "", errors.New("elaticsql: param error in date_histogram")
 						}
 						rightStr := sqlparser.String(comparisonExpr.Right)
 						rightStr = strings.Replace(rightStr, `'`, ``, -1)
@@ -386,7 +386,7 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 						}
 
 					default:
-						return "", errors.New("unsupported expression in date_histogram")
+						return "", errors.New("elasticsql: unsupported expression in date_histogram")
 					}
 				}
 
@@ -411,7 +411,7 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 	// but v in loop all use the same parentNode
 	var innerAggMap = make(map[string]interface{})
 	if parentNode == nil {
-		return "", errors.New("agg not supported yet")
+		return "", errors.New("elasticsql: agg not supported yet")
 	}
 
 	for _, v := range funcExprArr {
