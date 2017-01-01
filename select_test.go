@@ -47,6 +47,7 @@ var sqlArr = []string{
 	"select count(*) from ark group by date_histogram(field='create_time', value='1h')",
 	"select * from ark group by date_histogram(field='create_time', value='1h')",
 	"select * from ark group by date_histogram(field='create_time', value='1h'), id",
+	"select * from ark where a like group_concat('%', 'abc', '%')",
 }
 
 func TestSelect(t *testing.T) {

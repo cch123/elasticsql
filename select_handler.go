@@ -103,6 +103,26 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	return dsl, esType, nil
 }
 
+func buildNestedFuncStrValue(nestedFunc *sqlparser.FuncExpr) (string, error) {
+	var result string
+	switch string(nestedFunc.Name) {
+	case "group_concat":
+		for _, nestedExpr := range nestedFunc.Exprs {
+			switch nestedExpr.(type) {
+			case *sqlparser.NonStarExpr:
+				nonStarExpr := nestedExpr.(*sqlparser.NonStarExpr)
+				result += strings.Trim(sqlparser.String(nonStarExpr), `'`)
+			default:
+				return "", errors.New("unsupported expression" + sqlparser.String(nestedExpr))
+			}
+		}
+		//TODO support more functions
+	default:
+		return "", errors.New("unsupported function" + string(nestedFunc.Name))
+	}
+	return result, nil
+}
+
 func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
 	if expr == nil {
 		return "", errors.New("error expression cannot be nil here")
@@ -176,8 +196,22 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		}
 
 		colNameStr := sqlparser.String(colName)
-		rightStr := sqlparser.String(comparisonExpr.Right)
-		rightStr = strings.Trim(rightStr, `'`)
+		rightStr := ""
+		var err error
+		switch comparisonExpr.Right.(type) {
+		case sqlparser.StrVal:
+			sqlparser.String(comparisonExpr.Right)
+			rightStr = strings.Trim(rightStr, `'`)
+		case *sqlparser.FuncExpr:
+			// parse nested
+			funcExpr := comparisonExpr.Right.(*sqlparser.FuncExpr)
+			rightStr, err = buildNestedFuncStrValue(funcExpr)
+			if err != nil {
+				return "", err
+			}
+		case *sqlparser.ColName:
+			return "", errors.New("column name on the right side of compare operator is not supported")
+		}
 
 		resultStr := ""
 
