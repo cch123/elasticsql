@@ -200,8 +200,10 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		var err error
 		switch comparisonExpr.Right.(type) {
 		case sqlparser.StrVal:
-			sqlparser.String(comparisonExpr.Right)
+			rightStr = sqlparser.String(comparisonExpr.Right)
 			rightStr = strings.Trim(rightStr, `'`)
+		case sqlparser.NumVal:
+			rightStr = sqlparser.String(comparisonExpr.Right)
 		case *sqlparser.FuncExpr:
 			// parse nested
 			funcExpr := comparisonExpr.Right.(*sqlparser.FuncExpr)
@@ -211,6 +213,9 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			}
 		case *sqlparser.ColName:
 			return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
+		default:
+			// cannot reach here
+			// fmt.Printf("%#v", comparisonExpr.Right)
 		}
 
 		resultStr := ""
