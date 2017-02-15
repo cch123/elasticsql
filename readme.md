@@ -15,14 +15,15 @@ Currently support:
 - [x] lt(<) support
 - [x] lte(<=) support
 - [x] sql in (eg. id in (1,2,3) ) expression
+- [x] sql not in (eg. id not in (1,2,3) ) expression
 - [x] paren bool support (eg. where (a=1 or b=1) and (c=1 or d=1))
 - [x] sql like expression (currently use match phrase, perhaps will change to wildcard in the future)
 - [x] sql order by support
 - [x] sql limit support
-- [ ] sql not like expression
+- [x] sql not like expression
+- [x] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
 - [ ] null check expression(is null/is not null)
 - [ ] join expression
-- [x] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
 - [ ] having support
 
 *Improve : now the query DSL is much more flat*

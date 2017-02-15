@@ -213,6 +213,8 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			}
 		case *sqlparser.ColName:
 			return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
+		case sqlparser.ValTuple:
+			rightStr = sqlparser.String(comparisonExpr.Right)
 		default:
 			// cannot reach here
 			// fmt.Printf("%#v", comparisonExpr.Right)
@@ -244,7 +246,15 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			rightStr = strings.Replace(rightStr, `%`, ``, -1)
 			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
 		case "not like":
-			return "", errors.New("elasticsql: not like currently not supported")
+			rightStr = strings.Replace(rightStr, `%`, ``, -1)
+			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}}}`, colNameStr, rightStr)
+		case "not in":
+			// the default valTuple is ('1', '2', '3') like
+			// so need to drop the () and replace ' to "
+			rightStr = strings.Replace(rightStr, `'`, `"`, -1)
+			rightStr = strings.Trim(rightStr, "(")
+			rightStr = strings.Trim(rightStr, ")")
+			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"terms" : {"%v" : [%v]}}}}`, colNameStr, rightStr)
 		}
 
 		// the root node need to have bool and must
