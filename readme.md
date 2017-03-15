@@ -1,4 +1,5 @@
-##Overview
+Overview
+-----------
 [![Build Status](https://travis-ci.org/cch123/elasticsql.svg?branch=master)](https://travis-ci.org/cch123/elasticsql)
 [![Go Documentation](http://img.shields.io/badge/go-documentation-blue.svg?style=flat-square)](https://godoc.org/github.com/cch123/elasticsql)
 
@@ -26,9 +27,10 @@ Currently support:
 - [ ] join expression
 - [ ] having support
 
-*Improve : now the query DSL is much more flat*
+*Improvement : now the query DSL is much more flat*
 
-##Usage
+Usage
+-------------
 
 > go get github.com/cch123/elasticsql
 
@@ -108,16 +110,20 @@ will produce :
 aaa
 ```
 
-##Warning
+Warning
+------------
 To use this tool, you need to understand the term and match phrase of elasticsearch.
 
 Setting a field to analyzed or not analyzed will get different result.
 
-##Details
+Details
+------------
 For more details of convertion, please refer to the [wiki](https://github.com/cch123/elasticsql/wiki)
 
-##Other info
+Other info
+------------
 When writing this tool, I tried to avoid the deprecated dsl filters and aggregations, so it is compatable with most versions of the elasticsearch
 
-##License
+License
+-----------
 MIT
