@@ -110,6 +110,12 @@ will produce :
 aaa
 ```
 
+If your sql contains some keywords, eg. order, timestamp, don't forget to escape these fields as follows:
+
+```
+select * from `order` where `timestamp` = 1 and `desc`.id > 0
+```
+
 Warning
 ------------
 To use this tool, you need to understand the term and match phrase of elasticsearch.
