@@ -40,6 +40,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 		return "", "", errors.New("elasticsql: multiple from currently not supported")
 	}
 	esType = sqlparser.String(sel.From)
+	esType = strings.Replace(esType, "`", "", -1)
 
 	queryFrom, querySize := "0", "1"
 
@@ -196,6 +197,7 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 		}
 
 		colNameStr := sqlparser.String(colName)
+		colNameStr = strings.Replace(colNameStr, "`", "", -1)
 		rightStr := ""
 		var err error
 		switch comparisonExpr.Right.(type) {
