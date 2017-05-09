@@ -34,6 +34,8 @@ Usage
 
 > go get github.com/cch123/elasticsql
 
+> cd $GOPATH/src/github.com/cch123/elasticsql && godep restore
+
 Demo :
 ```go
 package main
