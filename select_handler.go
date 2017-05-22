@@ -437,7 +437,7 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 		aggName := strings.ToUpper(string(v.Name)) + `(` + sqlparser.String(v.Exprs) + `)`
 		switch string(v.Name) {
 		case "count":
-			//count need to distingush * and normal field name
+			//count need to distinguish * and normal field name
 			if sqlparser.String(v.Exprs) == "*" {
 				innerAggMap[aggName] = map[string]interface{}{
 					"value_count": map[string]string{
