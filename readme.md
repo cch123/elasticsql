@@ -23,7 +23,7 @@ Currently support:
 - [x] sql order by support
 - [x] sql limit support
 - [x] sql not like expression
-- [x] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
+- [ ] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
 - [ ] null check expression(is null/is not null)
 - [ ] join expression
 - [ ] having support
@@ -34,6 +34,8 @@ Usage
 -------------
 
 > go get github.com/cch123/elasticsql
+
+> cd $GOPATH/src/github.com/cch123/elasticsql && godep restore
 
 Demo :
 ```go
