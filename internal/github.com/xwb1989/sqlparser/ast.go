@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strconv"
 
-	"github.com/xwb1989/sqlparser/dependency/sqltypes"
+	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser/dependency/sqltypes"
 )
 
 // Instructions for creating new types: If a type

@@ -10,7 +10,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/xwb1989/sqlparser/dependency/sqltypes"
+	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser/dependency/sqltypes"
 )
 
 type bindLocation struct {

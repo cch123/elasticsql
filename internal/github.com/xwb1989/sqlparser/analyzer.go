@@ -11,7 +11,8 @@ package sqlparser
 import (
 	"errors"
 	"fmt"
-	"github.com/xwb1989/sqlparser/dependency/sqltypes"
+
+	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser/dependency/sqltypes"
 )
 
 // GetTableName returns the table name from the SimpleTableExpr

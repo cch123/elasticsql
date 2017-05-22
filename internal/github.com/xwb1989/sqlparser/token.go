@@ -9,7 +9,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/xwb1989/sqlparser/dependency/sqltypes"
+	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser/dependency/sqltypes"
 )
 
 const EOFCHAR = 0x100
