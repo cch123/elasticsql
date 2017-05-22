@@ -13,7 +13,6 @@ var sqlArr = []string{
 	"select occupy from ark_callcenter where process_id > 1",
 	"select occupy from ark_callcenter where process_id < 1",
 	"select occupy from ark_callcenter where process_id <= 1",
-	//注意，如果是字符串的话，需要把两边的单引号脱掉
 	"select occupy from ark_callcenter where process_id >= '1'",
 	"select occupy from ark_callcenter where process_id != 1",
 	"select occupy from ark_callcenter where process_id = 0 and status= 1 and channel = 4",
