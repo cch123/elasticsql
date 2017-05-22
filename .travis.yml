@@ -7,7 +7,6 @@ go:
   - 1.7
 
 before_install:
-  - go get -v github.com/xwb1989/sqlparser
   - go get -v github.com/mattn/goveralls
 
 install:
