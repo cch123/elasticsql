@@ -1,2 +1,23 @@
+sudo: false
 language: go
-script: go test -v
+
+go:
+  - 1.5
+  - 1.6
+  - 1.7
+
+before_install:
+  - go get -v github.com/xwb1989/sqlparser
+  - go get -v github.com/mattn/goveralls
+
+install:
+  - go get -d -t -v ./...
+  - go install -v
+
+script:
+  - go vet ./...
+  - go test -v -covermode=count -coverprofile=coverage.out
+  - $HOME/gopath/bin/goveralls -coverprofile=coverage.out -service=travis-ci
+
+-after_success:
+  - coveralls

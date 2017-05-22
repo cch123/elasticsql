@@ -50,6 +50,9 @@ var sqlArr = []string{
 	"select * from `order`.abcd where `by` = 1",
 }
 
+func mapDeepEqual() {
+}
+
 func TestSelect(t *testing.T) {
 	for _, sqlStr := range sqlArr {
 		stmt, err := sqlparser.Parse(sqlStr)
