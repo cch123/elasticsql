@@ -14,6 +14,9 @@ var unsupportedCaseList = []string{
 	"delete from a where id=1",
 	"select * from ak where NOT(id=1)",
 	"select * from ak where 1 = 1",
+	"select * from a,b",
+	"select * from a where 1=a",
+	"select * from a where id is null",
 }
 
 var selectCaseMap = map[string]string{
@@ -48,6 +51,8 @@ var selectCaseMap = map[string]string{
 	"select * from `order`.abcd where `by` = 1":                                                                                                                                                          `{"query" : {"bool" : {"must" : [{"match" : {"by" : {"query" : "1", "type" : "phrase"}}}]}},"from" : 0,"size" : 1}`,
 	"select * from ark where id not like '%aaa%'":                                                                                                                                                        `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : {"match" : {"id" : {"query" : "aaa", "type" : "phrase"}}}}}]}},"from" : 0,"size" : 1}`,
 	"select * from ark where id not in (1,2,3)":                                                                                                                                                          `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : {"terms" : {"id" : [1, 2, 3]}}}}]}},"from" : 0,"size" : 1}`,
+	"select * from abc limit 10,10":                                                                                                                                                                      `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 10,"size" : 10}`,
+	"select * from abc limit 10":                                                                                                                                                                         `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 10}`,
 }
 
 func TestSupported(t *testing.T) {
