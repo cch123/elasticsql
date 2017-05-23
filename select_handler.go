@@ -53,7 +53,6 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	if len(sel.GroupBy) > 0 {
 		aggFlag = true
 		querySize = "0"
-		//fmt.Printf("%#v\n", sel.GroupBy)
 		aggStr, err = buildAggs(sel)
 		if err != nil {
 			//aggStr = ""
@@ -145,7 +144,6 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 		// not toplevel
 		// if the parent node is also and, then the result can be merged
-		//fmt.Println("left is "+leftStr, "right is "+rightStr)
 
 		var resultStr string
 		if leftStr == "" || rightStr == "" {
@@ -219,7 +217,6 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 			rightStr = sqlparser.String(comparisonExpr.Right)
 		default:
 			// cannot reach here
-			// fmt.Printf("%#v", comparisonExpr.Right)
 		}
 
 		resultStr := ""
@@ -330,7 +327,6 @@ func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr,
 			continue
 		default:
 			//ignore
-			//fmt.Println("column not supported", sqlparser.String(expr.Expr))
 		}
 
 		//starExpression like *, table.* should be ignored
@@ -377,7 +373,6 @@ func buildAggs(sel *sqlparser.Select) (string, error) {
 			var field string
 			interval := "1h"
 			format := "yyyy-MM-dd HH:mm:ss"
-			//fmt.Println(string(funcExpr.Name)) date_histogram
 			if string(funcExpr.Name) == "date_histogram" {
 				innerMap := make(map[string]interface{})
 				//rightStr = strings.Replace(rightStr, `'`, `"`, -1)
