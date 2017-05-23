@@ -6,8 +6,6 @@ import (
 	"encoding/json"
 
 	"reflect"
-
-	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser"
 )
 
 var unsupportedCaseList = []string{
@@ -15,6 +13,7 @@ var unsupportedCaseList = []string{
 	"update a set id = 1",
 	"delete from a where id=1",
 	"select * from ak where NOT(id=1)",
+	"select * from ak where 1 = 1",
 }
 
 var selectCaseMap = map[string]string{
@@ -73,7 +72,7 @@ func TestSupported(t *testing.T) {
 		}
 
 		// test convert pretty
-		dsl, _, err = Convert(k)
+		dsl, _, err = ConvertPretty(k)
 		var dslConvertedPretty map[string]interface{}
 		err = json.Unmarshal([]byte(dsl), &dslConvertedPretty)
 
@@ -90,19 +89,13 @@ func TestSupported(t *testing.T) {
 
 func TestUnsupported(t *testing.T) {
 	for _, v := range unsupportedCaseList {
-		var err error
-		stmt, err := sqlparser.Parse(v)
-		switch x := stmt.(type) {
-		case *sqlparser.Update:
-			_, _, err = handleUpdate(x)
-		case *sqlparser.Delete:
-			_, _, err = handleDelete(x)
-		case *sqlparser.Insert:
-			_, _, err = handleInsert(x)
-		case *sqlparser.Select:
-			_, _, err = handleSelect(x)
+		_, _, err := Convert(v)
+
+		if err == nil {
+			t.Error("can not be true, these cases are not supported!")
 		}
 
+		_, _, err = ConvertPretty(v)
 		if err == nil {
 			t.Error("can not be true, these cases are not supported!")
 		}
