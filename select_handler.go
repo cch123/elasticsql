@@ -292,7 +292,13 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 	case *sqlparser.ParenBoolExpr:
 		parentBoolExpr := (*expr).(*sqlparser.ParenBoolExpr)
 		boolExpr := parentBoolExpr.Expr
-		return handleSelectWhere(&boolExpr, false, parent)
+
+		// if paren is the top level, bool must is needed
+		var isThisTopLevel = false
+		if topLevel {
+			isThisTopLevel = true
+		}
+		return handleSelectWhere(&boolExpr, isThisTopLevel, parent)
 	case *sqlparser.NotExpr:
 		return "", errors.New("elasticsql: not expression currently not supported")
 	}
