@@ -8,6 +8,13 @@ import (
 	"reflect"
 )
 
+var badSQLList = []string{
+	"select aaac fr",
+	"delete",
+	"update x",
+	"insert ",
+}
+
 var unsupportedCaseList = []string{
 	"insert into a values(1,2)",
 	"update a set id = 1",
@@ -106,5 +113,20 @@ func TestUnsupported(t *testing.T) {
 			t.Error("can not be true, these cases are not supported!")
 		}
 
+	}
+}
+
+func TestBadSQL(t *testing.T) {
+	for _, v := range badSQLList {
+		_, _, err := Convert(v)
+
+		if err == nil {
+			t.Error("can not be true, these cases are not supported!")
+		}
+
+		_, _, err = ConvertPretty(v)
+		if err == nil {
+			t.Error("can not be true, these cases are not supported!")
+		}
 	}
 }
