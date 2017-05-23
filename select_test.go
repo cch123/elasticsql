@@ -53,6 +53,7 @@ var selectCaseMap = map[string]string{
 	"select * from ark where id not in (1,2,3)":                                                                                                                                                          `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : {"terms" : {"id" : [1, 2, 3]}}}}]}},"from" : 0,"size" : 1}`,
 	"select * from abc limit 10,10":                                                                                                                                                                      `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 10,"size" : 10}`,
 	"select * from abc limit 10":                                                                                                                                                                         `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 10}`,
+	"select count(*), id from ark group by id":                                                                                                                                                           `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"id":{"aggregations":{"COUNT(*)":{"value_count":{"field":"_index"}}},"terms":{"field":"id","size":200}}}}`,
 }
 
 func TestSupported(t *testing.T) {
