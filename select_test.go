@@ -14,6 +14,7 @@ var unsupportedCaseList = []string{
 	"insert into a values(1,2)",
 	"update a set id = 1",
 	"delete from a where id=1",
+	"select * from ak where NOT(id=1)",
 }
 
 var selectCaseMap = map[string]string{
@@ -46,53 +47,8 @@ var selectCaseMap = map[string]string{
 	"select * from ark group by date_histogram(field='create_time', value='1h'), id":                                                                                                                     `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"date_histogram(field=create_time,value=1h)":{"aggregations":{"id":{"terms":{"field":"id","size":0}}},"date_histogram":{"field":"create_time","format":"yyyy-MM-dd HH:mm:ss","interval":"1h"}}}}`,
 	"select * from ark where a like group_concat('%', 'abc', '%')":                                                                                                                                       `{"query" : {"bool" : {"must" : [{"match" : {"a" : {"query" : "abc", "type" : "phrase"}}}]}},"from" : 0,"size" : 1}`,
 	"select * from `order`.abcd where `by` = 1":                                                                                                                                                          `{"query" : {"bool" : {"must" : [{"match" : {"by" : {"query" : "1", "type" : "phrase"}}}]}},"from" : 0,"size" : 1}`,
-}
-
-//currently not support join syntax
-var sqlArr = []string{
-	//"select count(*), occupy from callcenter,bbb where id>0 and a=0 and process_id in (1, 2) and a.t = 1 and (b.c=2 or b.d=1) order by aaa desc, ddd asc  limit 1,2",
-	"select occupy from ark where process_id= 1",
-	"select occupy from ark where (process_id= 1)",   // ?
-	"select occupy from ark where ((process_id= 1))", // ?
-	"select occupy from ark where (process_id = 1 and status=1)",
-	"select occupy from ark where process_id > 1",
-	"select occupy from ark where process_id < 1",
-	"select occupy from ark where process_id <= 1",
-	"select occupy from ark where process_id >= '1'",
-	"select occupy from ark where process_id != 1",
-	"select occupy from ark where process_id = 0 and status= 1 and channel = 4",
-	"select * from ark where create_time between '2015-01-01 00:00:00' and '2015-01-01 00:00:00'",
-	"select * from ark where process_id > 1 and status = 1",
-	"select * from ark where process_id = 1",
-	"select * from ark where create_time between '2015-01-01T00:00:00+0800' and '2017-01-01T00:00:00+0800' and process_id = 0 and status >= 1 and content = '三个男人' and phone = '15810324322'",
-	"select * from ark where id > 1 or process_id = 0",
-	"select * from ark where id > 1 and d = 1 or process_id = 0 and x = 2",
-	"select * from ark where id > 1 order by id asc, order_id desc",
-	"select * from ark where (id > 1 and d = 1)",
-	"select * from ark where (id > 1 and d = 1) or (c=1)",
-	//"select * from aaa where not a = 1", //no support
-	//"select * from aaa where not (a = 1)", //no support
-	"select * from ark where id > 1 or (process_id = 0)",
-	"select * from ark where id in (1,2,3,4)",
-	"select * from ark where id in ('232', '323') and content = 'aaaa'",
-	//"select * from ark where id in ('232', '323') and content like '%aaaa%'", not supported current
-	//"select * from ark_callc where id not like 'aaa'",
-	"select occupy from ark where a != 1",
-	"select occupy from ark where a > '1'",
-	//	"select occupy from ark where a is null",
-	//	"select occupy from ark where a is not   null",
-	"select occupy from ark where a =1 and b = 2 and c=3",
-	"select occupy from ark where create_time between '2015-01-01 00:00:00' and '2014-02-02 00:00:00'",
-	"select x from ark where a like '%a%'",
-	//"select channel, count(*) as d from ark where d = 1 group by channel, count(*)",
-	//"select id, count(*) from ark where d = 1 group by channel, count(*)",
-	//"select id, count(id), count(*) from ark where d = 1 group by channel, id, process_id",
-	//"SELECT sum(id),count(channel),avg(area_id),min(area_id), max(process_id), channel from g group by channel",
-	"select count(*) from ark group by date_histogram(field='create_time', value='1h')",
-	"select * from ark group by date_histogram(field='create_time', value='1h')",
-	"select * from ark group by date_histogram(field='create_time', value='1h'), id",
-	"select * from ark where a like group_concat('%', 'abc', '%')",
-	"select * from `order`.abcd where `by` = 1",
+	"select * from ark where id not like '%aaa%'":                                                                                                                                                        `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : {"match" : {"id" : {"query" : "aaa", "type" : "phrase"}}}}}]}},"from" : 0,"size" : 1}`,
+	"select * from ark where id not in (1,2,3)":                                                                                                                                                          `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : {"terms" : {"id" : [1, 2, 3]}}}}]}},"from" : 0,"size" : 1}`,
 }
 
 func TestSupported(t *testing.T) {
@@ -103,12 +59,8 @@ func TestSupported(t *testing.T) {
 			t.Error("test case json unmarshal err!")
 		}
 
-		stmt, err := sqlparser.Parse(k)
-		if err != nil {
-			t.Error("parse sql error", k, err)
-		}
-
-		dsl, _, err := handleSelect(stmt.(*sqlparser.Select))
+		// test convert
+		dsl, _, err := Convert(k)
 		var dslConvertedMap map[string]interface{}
 		err = json.Unmarshal([]byte(dsl), &dslConvertedMap)
 
@@ -117,6 +69,19 @@ func TestSupported(t *testing.T) {
 		}
 
 		if !reflect.DeepEqual(dslMap, dslConvertedMap) {
+			t.Error("the generated dsl is not equal to expected", k)
+		}
+
+		// test convert pretty
+		dsl, _, err = Convert(k)
+		var dslConvertedPretty map[string]interface{}
+		err = json.Unmarshal([]byte(dsl), &dslConvertedPretty)
+
+		if err != nil {
+			t.Error("the generated dsl json unmarshal error!", k)
+		}
+
+		if !reflect.DeepEqual(dslMap, dslConvertedPretty) {
 			t.Error("the generated dsl is not equal to expected", k)
 		}
 
@@ -134,6 +99,8 @@ func TestUnsupported(t *testing.T) {
 			_, _, err = handleDelete(x)
 		case *sqlparser.Insert:
 			_, _, err = handleInsert(x)
+		case *sqlparser.Select:
+			_, _, err = handleSelect(x)
 		}
 
 		if err == nil {
