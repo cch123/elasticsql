@@ -123,6 +123,152 @@ func buildNestedFuncStrValue(nestedFunc *sqlparser.FuncExpr) (string, error) {
 	return result, nil
 }
 
+func handleSelectWhereAndExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+	andExpr := (*expr).(*sqlparser.AndExpr)
+	leftExpr := andExpr.Left
+	rightExpr := andExpr.Right
+	leftStr, err := handleSelectWhere(&leftExpr, false, expr)
+	if err != nil {
+		return "", err
+	}
+	rightStr, err := handleSelectWhere(&rightExpr, false, expr)
+	if err != nil {
+		return "", err
+	}
+
+	// not toplevel
+	// if the parent node is also and, then the result can be merged
+
+	var resultStr string
+	if leftStr == "" || rightStr == "" {
+		resultStr = leftStr + rightStr
+	} else {
+		resultStr = leftStr + `,` + rightStr
+	}
+
+	if _, ok := (*parent).(*sqlparser.AndExpr); ok {
+		return resultStr, nil
+	}
+	return fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr), nil
+}
+
+func handleSelectWhereOrExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+	orExpr := (*expr).(*sqlparser.OrExpr)
+	leftExpr := orExpr.Left
+	rightExpr := orExpr.Right
+
+	leftStr, err := handleSelectWhere(&leftExpr, false, expr)
+	if err != nil {
+		return "", err
+	}
+
+	rightStr, err := handleSelectWhere(&rightExpr, false, expr)
+	if err != nil {
+		return "", err
+	}
+
+	var resultStr string
+	if leftStr == "" || rightStr == "" {
+		resultStr = leftStr + rightStr
+	} else {
+		resultStr = leftStr + `,` + rightStr
+	}
+
+	// not toplevel
+	// if the parent node is also or node, then merge the query param
+	if _, ok := (*parent).(*sqlparser.OrExpr); ok {
+		return resultStr, nil
+	}
+
+	return fmt.Sprintf(`{"bool" : {"should" : [%v]}}`, resultStr), nil
+}
+
+func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, error) {
+	var rightStr string
+	var err error
+	switch expr.(type) {
+	case sqlparser.StrVal:
+		rightStr = sqlparser.String(expr)
+		rightStr = strings.Trim(rightStr, `'`)
+	case sqlparser.NumVal:
+		rightStr = sqlparser.String(expr)
+	case *sqlparser.FuncExpr:
+		// parse nested
+		funcExpr := expr.(*sqlparser.FuncExpr)
+		rightStr, err = buildNestedFuncStrValue(funcExpr)
+		if err != nil {
+			return "", err
+		}
+	case *sqlparser.ColName:
+		return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
+	case sqlparser.ValTuple:
+		rightStr = sqlparser.String(expr)
+	default:
+		// cannot reach here
+	}
+	return rightStr, err
+}
+
+func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+	comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
+	colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
+
+	if !ok {
+		return "", errors.New("elasticsql: invalid comparison expression, the left must be a column name")
+	}
+
+	colNameStr := sqlparser.String(colName)
+	colNameStr = strings.Replace(colNameStr, "`", "", -1)
+	rightStr, err := buildComparisonExprRightStr(comparisonExpr.Right)
+	if err != nil {
+		return "", err
+	}
+
+	resultStr := ""
+
+	switch comparisonExpr.Operator {
+	case ">=":
+		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"from" : "%v"}}}`, colNameStr, rightStr)
+	case "<=":
+		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"to" : "%v"}}}`, colNameStr, rightStr)
+	case "=":
+		resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
+	case ">":
+		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"gt" : "%v"}}}`, colNameStr, rightStr)
+	case "<":
+		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"lt" : "%v"}}}`, colNameStr, rightStr)
+	case "!=":
+		resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}]}}`, colNameStr, rightStr)
+	case "in":
+		// the default valTuple is ('1', '2', '3') like
+		// so need to drop the () and replace ' to "
+		rightStr = strings.Replace(rightStr, `'`, `"`, -1)
+		rightStr = strings.Trim(rightStr, "(")
+		rightStr = strings.Trim(rightStr, ")")
+		resultStr = fmt.Sprintf(`{"terms" : {"%v" : [%v]}}`, colNameStr, rightStr)
+	case "like":
+		rightStr = strings.Replace(rightStr, `%`, ``, -1)
+		resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
+	case "not like":
+		rightStr = strings.Replace(rightStr, `%`, ``, -1)
+		resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}}}`, colNameStr, rightStr)
+	case "not in":
+		// the default valTuple is ('1', '2', '3') like
+		// so need to drop the () and replace ' to "
+		rightStr = strings.Replace(rightStr, `'`, `"`, -1)
+		rightStr = strings.Trim(rightStr, "(")
+		rightStr = strings.Trim(rightStr, ")")
+		resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"terms" : {"%v" : [%v]}}}}`, colNameStr, rightStr)
+	}
+
+	// the root node need to have bool and must
+	if topLevel {
+		resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
+	}
+
+	return resultStr, nil
+}
+
 func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
 	if expr == nil {
 		return "", errors.New("elasticsql: error expression cannot be nil here")
@@ -130,138 +276,12 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 	switch (*expr).(type) {
 	case *sqlparser.AndExpr:
-		andExpr := (*expr).(*sqlparser.AndExpr)
-		leftExpr := andExpr.Left
-		rightExpr := andExpr.Right
-		leftStr, err := handleSelectWhere(&leftExpr, false, expr)
-		if err != nil {
-			return "", err
-		}
-		rightStr, err := handleSelectWhere(&rightExpr, false, expr)
-		if err != nil {
-			return "", err
-		}
+		return handleSelectWhereAndExpr(expr, topLevel, parent)
 
-		// not toplevel
-		// if the parent node is also and, then the result can be merged
-
-		var resultStr string
-		if leftStr == "" || rightStr == "" {
-			resultStr = leftStr + rightStr
-		} else {
-			resultStr = leftStr + `,` + rightStr
-		}
-
-		if _, ok := (*parent).(*sqlparser.AndExpr); ok {
-			return resultStr, nil
-		}
-
-		return fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr), nil
 	case *sqlparser.OrExpr:
-		orExpr := (*expr).(*sqlparser.OrExpr)
-		leftExpr := orExpr.Left
-		rightExpr := orExpr.Right
-
-		leftStr, err := handleSelectWhere(&leftExpr, false, expr)
-		if err != nil {
-			return "", err
-		}
-
-		rightStr, err := handleSelectWhere(&rightExpr, false, expr)
-		if err != nil {
-			return "", err
-		}
-
-		var resultStr string
-		if leftStr == "" || rightStr == "" {
-			resultStr = leftStr + rightStr
-		} else {
-			resultStr = leftStr + `,` + rightStr
-		}
-
-		// not toplevel
-		// if the parent node is also or node, then merge the query param
-		if _, ok := (*parent).(*sqlparser.OrExpr); ok {
-			return resultStr, nil
-		}
-
-		return fmt.Sprintf(`{"bool" : {"should" : [%v]}}`, resultStr), nil
+		return handleSelectWhereOrExpr(expr, topLevel, parent)
 	case *sqlparser.ComparisonExpr:
-		comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
-		colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
-
-		if !ok {
-			return "", errors.New("elasticsql: invalid comparison expression, the left must be a column name")
-		}
-
-		colNameStr := sqlparser.String(colName)
-		colNameStr = strings.Replace(colNameStr, "`", "", -1)
-		rightStr := ""
-		var err error
-		switch comparisonExpr.Right.(type) {
-		case sqlparser.StrVal:
-			rightStr = sqlparser.String(comparisonExpr.Right)
-			rightStr = strings.Trim(rightStr, `'`)
-		case sqlparser.NumVal:
-			rightStr = sqlparser.String(comparisonExpr.Right)
-		case *sqlparser.FuncExpr:
-			// parse nested
-			funcExpr := comparisonExpr.Right.(*sqlparser.FuncExpr)
-			rightStr, err = buildNestedFuncStrValue(funcExpr)
-			if err != nil {
-				return "", err
-			}
-		case *sqlparser.ColName:
-			return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
-		case sqlparser.ValTuple:
-			rightStr = sqlparser.String(comparisonExpr.Right)
-		default:
-			// cannot reach here
-		}
-
-		resultStr := ""
-
-		switch comparisonExpr.Operator {
-		case ">=":
-			resultStr = fmt.Sprintf(`{"range" : {"%v" : {"from" : "%v"}}}`, colNameStr, rightStr)
-		case "<=":
-			resultStr = fmt.Sprintf(`{"range" : {"%v" : {"to" : "%v"}}}`, colNameStr, rightStr)
-		case "=":
-			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
-		case ">":
-			resultStr = fmt.Sprintf(`{"range" : {"%v" : {"gt" : "%v"}}}`, colNameStr, rightStr)
-		case "<":
-			resultStr = fmt.Sprintf(`{"range" : {"%v" : {"lt" : "%v"}}}`, colNameStr, rightStr)
-		case "!=":
-			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}]}}`, colNameStr, rightStr)
-		case "in":
-			// the default valTuple is ('1', '2', '3') like
-			// so need to drop the () and replace ' to "
-			rightStr = strings.Replace(rightStr, `'`, `"`, -1)
-			rightStr = strings.Trim(rightStr, "(")
-			rightStr = strings.Trim(rightStr, ")")
-			resultStr = fmt.Sprintf(`{"terms" : {"%v" : [%v]}}`, colNameStr, rightStr)
-		case "like":
-			rightStr = strings.Replace(rightStr, `%`, ``, -1)
-			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
-		case "not like":
-			rightStr = strings.Replace(rightStr, `%`, ``, -1)
-			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}}}`, colNameStr, rightStr)
-		case "not in":
-			// the default valTuple is ('1', '2', '3') like
-			// so need to drop the () and replace ' to "
-			rightStr = strings.Replace(rightStr, `'`, `"`, -1)
-			rightStr = strings.Trim(rightStr, "(")
-			rightStr = strings.Trim(rightStr, ")")
-			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : {"terms" : {"%v" : [%v]}}}}`, colNameStr, rightStr)
-		}
-
-		// the root node need to have bool and must
-		if topLevel {
-			resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
-		}
-
-		return resultStr, nil
+		return handleSelectWhereComparisonExpr(expr, topLevel, parent)
 
 	case *sqlparser.NullCheck:
 		return "", errors.New("elasticsql: null check expression currently not supported")
