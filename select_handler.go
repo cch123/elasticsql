@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser"
+	"github.com/xwb1989/sqlparser"
 )
 
 func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) {

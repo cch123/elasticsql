@@ -5,7 +5,7 @@ import (
 
 	"encoding/json"
 
-	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser"
+	"github.com/xwb1989/sqlparser"
 )
 
 // ConvertPretty will transform sql to elasticsearch dsl, and prettify the output json

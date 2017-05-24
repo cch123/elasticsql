@@ -3,7 +3,7 @@ package elasticsql
 import (
 	"errors"
 
-	"github.com/cch123/elasticsql/internal/github.com/xwb1989/sqlparser"
+	"github.com/xwb1989/sqlparser"
 )
 
 func handleUpdate(upd *sqlparser.Update) (string, string, error) {
