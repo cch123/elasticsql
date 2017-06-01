@@ -321,35 +321,3 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 	return "", errors.New("elaticsql: logically cannot reached here")
 }
-
-// extract func expressions from select exprs
-func handleSelectSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.FuncExpr, []*sqlparser.ColName, error) {
-	var colArr []*sqlparser.ColName
-	var funcArr []*sqlparser.FuncExpr
-	for _, v := range sqlSelect {
-		// non star expressioin means column name
-		// or some aggregation functions
-		expr, ok := v.(*sqlparser.NonStarExpr)
-		if !ok {
-			// no need to handle, star expression * just skip is ok
-			continue
-		}
-
-		// NonStarExpr start
-
-		switch expr.Expr.(type) {
-		case *sqlparser.FuncExpr:
-			funcExpr := expr.Expr.(*sqlparser.FuncExpr)
-			funcArr = append(funcArr, funcExpr)
-
-		case *sqlparser.ColName:
-			continue
-		default:
-			//ignore
-		}
-
-		//starExpression like *, table.* should be ignored
-		//'cause it is meaningless to set fields in elasticsearch aggs
-	}
-	return funcArr, colArr, nil
-}
