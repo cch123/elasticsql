@@ -29,8 +29,6 @@ Currently support:
 - [ ] join expression
 - [ ] having support
 
-*Improvement : now the query DSL is much more flat*
-
 Usage
 -------------
 
