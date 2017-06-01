@@ -29,12 +29,10 @@ Currently support:
 - [ ] join expression
 - [ ] having support
 
-*Improvement : now the query DSL is much more flat*
-
 Usage
 -------------
 
-> go get github.com/cch123/elasticsql
+> go get -u github.com/cch123/elasticsql
 
 Demo :
 ```go
