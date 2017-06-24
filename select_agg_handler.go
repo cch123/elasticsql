@@ -8,9 +8,12 @@ import (
 	"github.com/xwb1989/sqlparser"
 )
 
-func handleInnerAggMap(funcExprArr []*sqlparser.FuncExpr) map[string]interface{} {
+// msi stands for map[string]interface{}
+type msi map[string]interface{}
 
-	var innerAggMap = make(map[string]interface{})
+func handleFuncInSelectAgg(funcExprArr []*sqlparser.FuncExpr) msi {
+
+	var innerAggMap = make(msi)
 	for _, v := range funcExprArr {
 		//func expressions will use the same parent bucket
 
@@ -19,22 +22,22 @@ func handleInnerAggMap(funcExprArr []*sqlparser.FuncExpr) map[string]interface{}
 		case "count":
 			//count need to distinguish * and normal field name
 			if sqlparser.String(v.Exprs) == "*" {
-				innerAggMap[aggName] = map[string]interface{}{
-					"value_count": map[string]string{
+				innerAggMap[aggName] = msi{
+					"value_count": msi{
 						"field": "_index",
 					},
 				}
 			} else {
-				innerAggMap[aggName] = map[string]interface{}{
-					"value_count": map[string]string{
+				innerAggMap[aggName] = msi{
+					"value_count": msi{
 						"field": sqlparser.String(v.Exprs),
 					},
 				}
 			}
 		default:
 			// support min/avg/max
-			innerAggMap[aggName] = map[string]interface{}{
-				string(v.Name): map[string]string{
+			innerAggMap[aggName] = msi{
+				string(v.Name): msi{
 					"field": sqlparser.String(v.Exprs),
 				},
 			}
@@ -46,26 +49,29 @@ func handleInnerAggMap(funcExprArr []*sqlparser.FuncExpr) map[string]interface{}
 
 }
 
-func handleGroupByColName(colName *sqlparser.ColName, index int) map[string]interface{} {
-	innerMap := make(map[string]interface{})
+func handleGroupByColName(colName *sqlparser.ColName, index int, child msi) msi {
+	innerMap := make(msi)
 	if index == 0 {
-		innerMap["terms"] = map[string]interface{}{
+		innerMap["terms"] = msi{
 			"field": string(colName.Name),
 			"size":  200, // this size may need to change ?
 		}
 	} else {
-		innerMap["terms"] = map[string]interface{}{
+		innerMap["terms"] = msi{
 			"field": string(colName.Name),
 			"size":  0,
 		}
 	}
 
-	return innerMap
+	if len(child) > 0 {
+		innerMap["aggregations"] = child
+	}
+	return msi{string(colName.Name): innerMap}
 }
 
-func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr) (map[string]interface{}, error) {
+func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr, child msi) (msi, error) {
 
-	innerMap := make(map[string]interface{})
+	innerMap := make(msi)
 	switch string(funcExpr.Name) {
 	case "date_histogram":
 		var (
@@ -101,90 +107,74 @@ func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr) (map[string]interface{}
 					format = rightStr
 				}
 
-				innerMap["date_histogram"] = map[string]interface{}{
+				innerMap["date_histogram"] = msi{
 					"field":    field,
 					"interval": interval,
 					"format":   format,
 				}
-				return innerMap, nil
 			default:
 				return nil, errors.New("elasticsql: unsupported expression in date_histogram")
 			}
 		}
+	default:
+		return nil, errors.New("elasticsql: unsupported group by functions" + sqlparser.String(funcExpr))
 	}
-	return nil, errors.New("elasticsql: not supported agg func yet")
+
+	if len(innerMap) == 0 {
+		return nil, errors.New("elasticsql: not supported agg func yet")
+	}
+
+	if len(child) > 0 {
+		innerMap["aggregations"] = child
+	}
+
+	stripedFuncExpr := sqlparser.String(funcExpr)
+	stripedFuncExpr = strings.Replace(stripedFuncExpr, " ", "", -1)
+	stripedFuncExpr = strings.Replace(stripedFuncExpr, "'", "", -1)
+	return msi{stripedFuncExpr: innerMap}, nil
 }
 
-func handleOuterAgg(groupBy sqlparser.GroupBy) (map[string]interface{}, *map[string]interface{}, error) {
+func handleGroupByAgg(groupBy sqlparser.GroupBy, innerMap msi) (msi, error) {
 
-	var aggMap = make(map[string]interface{})
-	// point to the parent map value
-	var parentNode *map[string]interface{}
-	//for idx, v := range colNameArr {
-	for idx, v := range groupBy {
+	var aggMap = make(msi)
+
+	var child = innerMap
+
+	for i := len(groupBy) - 1; i >= 0; i-- {
+		v := groupBy[i]
+
 		switch item := v.(type) {
 		case *sqlparser.ColName:
-			colName := v.(*sqlparser.ColName)
-			innerMap := handleGroupByColName(item, idx)
-
-			if idx == 0 {
-				aggMap[string(colName.Name)] = innerMap
-				parentNode = &innerMap
-			} else {
-				(*parentNode)["aggregations"] = map[string]interface{}{
-					string(colName.Name): innerMap,
-				}
-				parentNode = &innerMap
-			}
+			currentMap := handleGroupByColName(item, i, child)
+			child = currentMap
 
 		case *sqlparser.FuncExpr:
-			funcExpr := v.(*sqlparser.FuncExpr)
-			innerMap, err := handleGroupByFuncExpr(item)
+			currentMap, err := handleGroupByFuncExpr(item, child)
 			if err != nil {
-				return nil, nil, err
+				return nil, err
 			}
-
-			keyName := sqlparser.String(funcExpr)
-			keyName = strings.Replace(keyName, `'`, ``, -1)
-			keyName = strings.Replace(keyName, ` `, ``, -1)
-			aggMap[keyName] = innerMap
-			parentNode = &innerMap
-
+			child = currentMap
 		}
 	}
+	aggMap = child
 
-	return aggMap, parentNode, nil
+	return aggMap, nil
 }
 
-// this function becomes too complicated, need refactor
 func buildAggs(sel *sqlparser.Select) (string, error) {
 
-	//the outer agg tree is built with the normal field extracted from group by
-	aggMap, parentNode, err := handleOuterAgg(sel.GroupBy)
+	funcExprArr, _, funcErr := extractFuncAndColFromSelect(sel.SelectExprs)
+	innerAggMap := handleFuncInSelectAgg(funcExprArr)
+
+	if funcErr != nil {
+	}
+
+	aggMap, err := handleGroupByAgg(sel.GroupBy, innerAggMap)
 	if err != nil {
 		return "", err
 	}
 
-	funcExprArr, _, funcErr := extractFuncAndColFromSelect(sel.SelectExprs)
-
-	// the final parentNode is the exact node
-	// to nest the aggreagation functions
-	// but v in loop all use the same parentNode
-	if parentNode == nil {
-		return "", errors.New("elasticsql: agg not supported yet")
-	}
-
-	innerAggMap := handleInnerAggMap(funcExprArr)
-
-	if len(innerAggMap) > 0 {
-		(*parentNode)["aggregations"] = innerAggMap
-	}
-
 	mapJSON, _ := json.Marshal(aggMap)
-
-	//if colErr == nil && funcErr == nil {
-	if funcErr == nil {
-	}
 
 	return string(mapJSON), nil
 }
