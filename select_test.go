@@ -64,6 +64,7 @@ var selectCaseMap = map[string]string{
 	"SELECT COUNT(distinct age) FROM bank GROUP BY range(age, 20,25,30,35,40)":                                                                                                                           `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"range(age,20,25,30,35,40)":{"aggregations":{"COUNT(age)":{"cardinality":{"field":"age"}}},"range":{"field":"age","ranges":[{"from":"20","to":"25"},{"from":"25","to":"30"},{"from":"30","to":"35"},{"from":"35","to":"40"}]}}}}`,
 	"select * from a where id != missing":                                                                                                                                                                `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : [{"missing":{"field":"id"}}]}}]}},"from" : 0,"size" : 1}`,
 	"select * from a where id = missing":                                                                                                                                                                 `{"query" : {"bool" : {"must" : [{"missing":{"field":"id"}}]}},"from" : 0,"size" : 1}`,
+	"select count(*) from a":                                                                                                                                                                             `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"COUNT(*)":{"value_count":{"field":"_index"}}}}`,
 }
 
 func TestSupported(t *testing.T) {

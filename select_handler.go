@@ -49,7 +49,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	// to not return any query result
 
 	var aggStr string
-	if len(sel.GroupBy) > 0 {
+	if len(sel.GroupBy) > 0 || checkNeedAgg(sel.SelectExprs) {
 		aggFlag = true
 		querySize = "0"
 		aggStr, err = buildAggs(sel)
@@ -100,6 +100,23 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 
 	dsl = "{" + strings.Join(resultArr, ",") + "}"
 	return dsl, esType, nil
+}
+
+// if the where is empty, need to check whether to agg or not
+func checkNeedAgg(sqlSelect sqlparser.SelectExprs) bool {
+	for _, v := range sqlSelect {
+		expr, ok := v.(*sqlparser.NonStarExpr)
+		if !ok {
+			// no need to handle, star expression * just skip is ok
+			continue
+		}
+
+		//TODO more precise
+		if _, ok := expr.Expr.(*sqlparser.FuncExpr); ok {
+			return true
+		}
+	}
+	return false
 }
 
 func buildNestedFuncStrValue(nestedFunc *sqlparser.FuncExpr) (string, error) {
