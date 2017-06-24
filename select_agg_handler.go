@@ -28,10 +28,19 @@ func handleFuncInSelectAgg(funcExprArr []*sqlparser.FuncExpr) msi {
 					},
 				}
 			} else {
-				innerAggMap[aggName] = msi{
-					"value_count": msi{
-						"field": sqlparser.String(v.Exprs),
-					},
+				// support count(distinct field)
+				if v.Distinct {
+					innerAggMap[aggName] = msi{
+						"cardinality": msi{
+							"field": sqlparser.String(v.Exprs),
+						},
+					}
+				} else {
+					innerAggMap[aggName] = msi{
+						"value_count": msi{
+							"field": sqlparser.String(v.Exprs),
+						},
+					}
 				}
 			}
 		default:
@@ -69,62 +78,103 @@ func handleGroupByColName(colName *sqlparser.ColName, index int, child msi) msi 
 	return msi{string(colName.Name): innerMap}
 }
 
-func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr, child msi) (msi, error) {
-
+func handleGroupByFuncExprDateHisto(funcExpr *sqlparser.FuncExpr) (msi, error) {
 	innerMap := make(msi)
-	switch string(funcExpr.Name) {
-	case "date_histogram":
-		var (
-			// default
-			field    = ""
-			interval = "1h"
-			format   = "yyyy-MM-dd HH:mm:ss"
-		)
+	var (
+		// default
+		field    = ""
+		interval = "1h"
+		format   = "yyyy-MM-dd HH:mm:ss"
+	)
 
-		//get field/interval and format
-		for _, expr := range funcExpr.Exprs {
-			// the expression in date_histogram must be like a = b format
-			switch expr.(type) {
-			case *sqlparser.NonStarExpr:
-				nonStarExpr := expr.(*sqlparser.NonStarExpr)
-				comparisonExpr, ok := nonStarExpr.Expr.(*sqlparser.ComparisonExpr)
-				if !ok {
-					return nil, errors.New("elasticsql: unsupported expression in date_histogram")
-				}
-				left, ok := comparisonExpr.Left.(*sqlparser.ColName)
-				if !ok {
-					return nil, errors.New("elaticsql: param error in date_histogram")
-				}
-				rightStr := sqlparser.String(comparisonExpr.Right)
-				rightStr = strings.Replace(rightStr, `'`, ``, -1)
-				if string(left.Name) == "field" {
-					field = rightStr
-				}
-				if string(left.Name) == "interval" {
-					interval = rightStr
-				}
-				if string(left.Name) == "format" {
-					format = rightStr
-				}
-
-				innerMap["date_histogram"] = msi{
-					"field":    field,
-					"interval": interval,
-					"format":   format,
-				}
-			default:
+	//get field/interval and format
+	for _, expr := range funcExpr.Exprs {
+		// the expression in date_histogram must be like a = b format
+		switch expr.(type) {
+		case *sqlparser.NonStarExpr:
+			nonStarExpr := expr.(*sqlparser.NonStarExpr)
+			comparisonExpr, ok := nonStarExpr.Expr.(*sqlparser.ComparisonExpr)
+			if !ok {
 				return nil, errors.New("elasticsql: unsupported expression in date_histogram")
 			}
+			left, ok := comparisonExpr.Left.(*sqlparser.ColName)
+			if !ok {
+				return nil, errors.New("elaticsql: param error in date_histogram")
+			}
+			rightStr := sqlparser.String(comparisonExpr.Right)
+			rightStr = strings.Replace(rightStr, `'`, ``, -1)
+			if string(left.Name) == "field" {
+				field = rightStr
+			}
+			if string(left.Name) == "interval" {
+				interval = rightStr
+			}
+			if string(left.Name) == "format" {
+				format = rightStr
+			}
+
+			innerMap["date_histogram"] = msi{
+				"field":    field,
+				"interval": interval,
+				"format":   format,
+			}
+		default:
+			return nil, errors.New("elasticsql: unsupported expression in date_histogram")
 		}
+	}
+	return innerMap, nil
+}
+
+func handleGroupByFuncExprRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
+	if len(funcExpr.Exprs) < 3 {
+		return nil, errors.New("elasticsql: length of function range params must be > 3")
+	}
+
+	var innerMap = make(msi)
+	rangeMapList := make([]msi, len(funcExpr.Exprs)-2)
+
+	for i := 1; i < len(funcExpr.Exprs)-1; i++ {
+		valFrom := sqlparser.String(funcExpr.Exprs[i])
+		valTo := sqlparser.String(funcExpr.Exprs[i+1])
+		rangeMapList[i-1] = msi{
+			"from": valFrom,
+			"to":   valTo,
+		}
+	}
+	innerMap[string(funcExpr.Name)] = msi{
+		"field":  sqlparser.String(funcExpr.Exprs[0]),
+		"ranges": rangeMapList,
+	}
+
+	return innerMap, nil
+}
+
+func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
+	var innerMap msi
+	return innerMap, errors.New("elasticsql: date range not supported yet")
+}
+
+func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr, child msi) (msi, error) {
+
+	var innerMap msi
+	var err error
+
+	switch string(funcExpr.Name) {
+	case "date_histogram":
+		innerMap, err = handleGroupByFuncExprDateHisto(funcExpr)
+	case "range":
+		innerMap, err = handleGroupByFuncExprRange(funcExpr)
+	case "date_range":
+		innerMap, err = handleGroupByFuncExprDateRange(funcExpr)
 	default:
 		return nil, errors.New("elasticsql: unsupported group by functions" + sqlparser.String(funcExpr))
 	}
 
-	if len(innerMap) == 0 {
-		return nil, errors.New("elasticsql: not supported agg func yet")
+	if err != nil {
+		return nil, err
 	}
 
-	if len(child) > 0 {
+	if len(child) > 0 && innerMap != nil {
 		innerMap["aggregations"] = child
 	}
 
