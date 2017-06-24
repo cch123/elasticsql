@@ -182,9 +182,10 @@ func handleSelectWhereOrExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sq
 	return fmt.Sprintf(`{"bool" : {"should" : [%v]}}`, resultStr), nil
 }
 
-func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, error) {
+func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, bool, error) {
 	var rightStr string
 	var err error
+	var missingCheck = false
 	switch expr.(type) {
 	case sqlparser.StrVal:
 		rightStr = sqlparser.String(expr)
@@ -196,16 +197,21 @@ func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, error) {
 		funcExpr := expr.(*sqlparser.FuncExpr)
 		rightStr, err = buildNestedFuncStrValue(funcExpr)
 		if err != nil {
-			return "", err
+			return "", missingCheck, err
 		}
 	case *sqlparser.ColName:
-		return "", errors.New("elasticsql: column name on the right side of compare operator is not supported")
+		if sqlparser.String(expr) == "missing" {
+			missingCheck = true
+			return "", missingCheck, nil
+		}
+
+		return "", missingCheck, errors.New("elasticsql: column name on the right side of compare operator is not supported")
 	case sqlparser.ValTuple:
 		rightStr = sqlparser.String(expr)
 	default:
 		// cannot reach here
 	}
-	return rightStr, err
+	return rightStr, missingCheck, err
 }
 
 func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
@@ -218,7 +224,7 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, pa
 
 	colNameStr := sqlparser.String(colName)
 	colNameStr = strings.Replace(colNameStr, "`", "", -1)
-	rightStr, err := buildComparisonExprRightStr(comparisonExpr.Right)
+	rightStr, missingCheck, err := buildComparisonExprRightStr(comparisonExpr.Right)
 	if err != nil {
 		return "", err
 	}
@@ -231,13 +237,22 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, pa
 	case "<=":
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"to" : "%v"}}}`, colNameStr, rightStr)
 	case "=":
-		resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
+		// field is missing
+		if missingCheck {
+			resultStr = fmt.Sprintf(`{"missing":{"field":"%v"}}`, colNameStr)
+		} else {
+			resultStr = fmt.Sprintf(`{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}`, colNameStr, rightStr)
+		}
 	case ">":
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"gt" : "%v"}}}`, colNameStr, rightStr)
 	case "<":
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"lt" : "%v"}}}`, colNameStr, rightStr)
 	case "!=":
-		resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}]}}`, colNameStr, rightStr)
+		if missingCheck {
+			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"missing":{"field":"%v"}}]}}`, colNameStr)
+		} else {
+			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"match" : {"%v" : {"query" : "%v", "type" : "phrase"}}}]}}`, colNameStr, rightStr)
+		}
 	case "in":
 		// the default valTuple is ('1', '2', '3') like
 		// so need to drop the () and replace ' to "
