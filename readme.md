@@ -132,6 +132,8 @@ Other info
 ------------
 When writing this tool, I tried to avoid the deprecated dsl filters and aggregations, so it is compatable with most versions of the elasticsearch
 
+If you have any advices or ideas, welcome to submit an issue or Pull Request!
+
 License
 -----------
 MIT
