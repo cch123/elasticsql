@@ -151,7 +151,60 @@ func handleGroupByFuncExprRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 
 func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 	var innerMap msi
-	return innerMap, errors.New("elasticsql: date range not supported yet")
+	var (
+		field        string
+		format       = "yyyy-MM-dd HH:mm:ss"
+		rangeList    = []string{}
+		rangeMapList = []msi{}
+	)
+
+	for _, expr := range funcExpr.Exprs {
+		nonStarExpr, ok := expr.(*sqlparser.NonStarExpr)
+		if !ok {
+			return nil, errors.New("elasticsql: unsupported star expression in function date_range")
+		}
+
+		switch item := nonStarExpr.Expr.(type) {
+		case *sqlparser.ComparisonExpr:
+			colName := sqlparser.String(item.Left)
+			equalVal := sqlparser.String(item.Right.(sqlparser.StrVal))
+			equalVal = strings.Trim(equalVal, `'`)
+
+			switch colName {
+			case "field":
+				field = equalVal
+			case "format":
+				format = equalVal
+			default:
+				return nil, errors.New("elasticsql: unsupported column name " + colName)
+			}
+		case sqlparser.StrVal:
+			rangeList = append(rangeList, sqlparser.String(item))
+		default:
+		}
+	}
+
+	if len(field) == 0 {
+		return nil, errors.New("elasticsql: lack field of date_range")
+	}
+
+	for i := 0; i < len(rangeList)-1; i++ {
+		tmpMap := msi{
+			"from": strings.Trim(rangeList[i], `'`),
+			"to":   strings.Trim(rangeList[i+1], `'`),
+		}
+		rangeMapList = append(rangeMapList, tmpMap)
+	}
+
+	innerMap = msi{
+		"date_range": msi{
+			"field":  field,
+			"ranges": rangeMapList,
+			"format": format,
+		},
+	}
+
+	return innerMap, nil
 }
 
 func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr, child msi) (msi, error) {
