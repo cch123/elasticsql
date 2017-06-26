@@ -24,6 +24,7 @@ var unsupportedCaseList = []string{
 	"select * from a,b",
 	"select * from a where 1=a",
 	"select * from a where id is null",
+	"select * from a group by sqrt(id)",
 }
 
 var selectCaseMap = map[string]string{
@@ -65,7 +66,8 @@ var selectCaseMap = map[string]string{
 	"select * from a where id != missing":                                                                                                                                                                `{"query" : {"bool" : {"must" : [{"bool" : {"must_not" : [{"missing":{"field":"id"}}]}}]}},"from" : 0,"size" : 1}`,
 	"select * from a where id = missing":                                                                                                                                                                 `{"query" : {"bool" : {"must" : [{"missing":{"field":"id"}}]}},"from" : 0,"size" : 1}`,
 	"select count(*) from a":                                                                                                                                                                             `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"COUNT(*)":{"value_count":{"field":"_index"}}}}`,
-	"SELECT online FROM online GROUP BY date_range(field='insert_time' ,'2014-08-18','2014-08-17','now-8d','now-7d','now-6d','now')": `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"date_range(field=insert_time,2014-08-18,2014-08-17,now-8d,now-7d,now-6d,now)":{"date_range":{"field":"insert_time","format":"yyyy-MM-dd HH:mm:ss","ranges":[{"from":"2014-08-18","to":"2014-08-17"},{"from":"2014-08-17","to":"now-8d"},{"from":"now-8d","to":"now-7d"},{"from":"now-7d","to":"now-6d"},{"from":"now-6d","to":"now"}]}}}}`,
+	"SELECT online FROM online GROUP BY date_range(field='insert_time' , format='yyyy-MM-dd', '2014-08-18','2014-08-17','now-8d','now-7d','now-6d','now')": `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"date_range(field=insert_time,format=yyyy-MM-dd,2014-08-18,2014-08-17,now-8d,now-7d,now-6d,now)":{"date_range":{"field":"insert_time","format":"yyyy-MM-dd","ranges":[{"from":"2014-08-18","to":"2014-08-17"},{"from":"2014-08-17","to":"now-8d"},{"from":"now-8d","to":"now-7d"},{"from":"now-7d","to":"now-6d"},{"from":"now-6d","to":"now"}]}}}}`,
+	"select count(id), sum(age) from a group by id":                                                                                                        `{"query" : {"bool" : {"must": [{"match_all" : {}}]}},"from" : 0,"size" : 0,"aggregations" : {"id":{"aggregations":{"COUNT(id)":{"value_count":{"field":"id"}},"SUM(age)":{"sum":{"field":"age"}}},"terms":{"field":"id","size":200}}}}`,
 }
 
 func TestSupported(t *testing.T) {

@@ -182,6 +182,7 @@ func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 		case sqlparser.StrVal:
 			rangeList = append(rangeList, sqlparser.String(item))
 		default:
+			return nil, errors.New("elasticsql: unsupported expression " + sqlparser.String(expr))
 		}
 	}
 
