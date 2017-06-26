@@ -25,7 +25,8 @@ Currently support:
 - [x] sql limit support
 - [x] sql not like expression
 - [x] field missing check
-- [x] aggregation like count(\*), count(field), min(field), max(field), avg(field)/group by support
+- [x] support aggregation like count(\*), count(field), min(field), max(field), avg(field)
+- [x] support aggregation like stats(field), extended_stats(field), percentiles(field) which are not standard sql function
 - [ ] null check expression(is null/is not null)
 - [ ] join expression
 - [ ] having support

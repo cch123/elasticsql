@@ -44,7 +44,8 @@ func handleFuncInSelectAgg(funcExprArr []*sqlparser.FuncExpr) msi {
 				}
 			}
 		default:
-			// support min/avg/max
+			// support min/avg/max/stats
+			// extended_stats/percentiles
 			innerAggMap[aggName] = msi{
 				string(v.Name): msi{
 					"field": sqlparser.String(v.Exprs),
