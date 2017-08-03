@@ -72,7 +72,8 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	var orderByArr []string
 	if aggFlag == false {
 		for _, orderByExpr := range sel.OrderBy {
-			orderByStr := fmt.Sprintf(`{"%v": "%v"}`, sqlparser.String(orderByExpr.Expr), orderByExpr.Direction)
+			field := strings.Replace(sqlparser.String(orderByExpr.Expr), "`", "", -1)
+			orderByStr := fmt.Sprintf(`{"%v": "%v"}`, field, orderByExpr.Direction)
 			orderByArr = append(orderByArr, orderByStr)
 		}
 	}
