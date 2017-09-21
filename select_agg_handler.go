@@ -108,7 +108,7 @@ func handleGroupByFuncExprDateHisto(funcExpr *sqlparser.FuncExpr) (msi, error) {
 			if left.Name.Lowered() == "field" {
 				field = rightStr
 			}
-			if left.Name.Lowered() == "interval" {
+			if left.Name.Lowered() == "value" {
 				interval = rightStr
 			}
 			if left.Name.Lowered() == "format" {
