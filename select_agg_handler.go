@@ -17,8 +17,8 @@ func handleFuncInSelectAgg(funcExprArr []*sqlparser.FuncExpr) msi {
 	for _, v := range funcExprArr {
 		//func expressions will use the same parent bucket
 
-		aggName := strings.ToUpper(string(v.Name)) + `(` + sqlparser.String(v.Exprs) + `)`
-		switch string(v.Name) {
+		aggName := strings.ToUpper(v.Name.String()) + `(` + sqlparser.String(v.Exprs) + `)`
+		switch v.Name.Lowered() {
 		case "count":
 			//count need to distinguish * and normal field name
 			if sqlparser.String(v.Exprs) == "*" {
@@ -47,7 +47,7 @@ func handleFuncInSelectAgg(funcExprArr []*sqlparser.FuncExpr) msi {
 			// support min/avg/max/stats
 			// extended_stats/percentiles
 			innerAggMap[aggName] = msi{
-				string(v.Name): msi{
+				v.Name.String(): msi{
 					"field": sqlparser.String(v.Exprs),
 				},
 			}
@@ -63,12 +63,12 @@ func handleGroupByColName(colName *sqlparser.ColName, index int, child msi) msi 
 	innerMap := make(msi)
 	if index == 0 {
 		innerMap["terms"] = msi{
-			"field": string(colName.Name),
+			"field": colName.Name.String(),
 			"size":  200, // this size may need to change ?
 		}
 	} else {
 		innerMap["terms"] = msi{
-			"field": string(colName.Name),
+			"field": colName.Name.String(),
 			"size":  0,
 		}
 	}
@@ -76,7 +76,7 @@ func handleGroupByColName(colName *sqlparser.ColName, index int, child msi) msi 
 	if len(child) > 0 {
 		innerMap["aggregations"] = child
 	}
-	return msi{string(colName.Name): innerMap}
+	return msi{colName.Name.String(): innerMap}
 }
 
 func handleGroupByFuncExprDateHisto(funcExpr *sqlparser.FuncExpr) (msi, error) {
@@ -91,10 +91,11 @@ func handleGroupByFuncExprDateHisto(funcExpr *sqlparser.FuncExpr) (msi, error) {
 	//get field/interval and format
 	for _, expr := range funcExpr.Exprs {
 		// the expression in date_histogram must be like a = b format
-		switch expr.(type) {
-		case *sqlparser.NonStarExpr:
-			nonStarExpr := expr.(*sqlparser.NonStarExpr)
-			comparisonExpr, ok := nonStarExpr.Expr.(*sqlparser.ComparisonExpr)
+		switch item := expr.(type) {
+		case *sqlparser.AliasedExpr:
+			//nonStarExpr := expr.(*sqlparser.NonStarExpr)
+			comparisonExpr, ok := item.Expr.(*sqlparser.ComparisonExpr)
+
 			if !ok {
 				return nil, errors.New("elasticsql: unsupported expression in date_histogram")
 			}
@@ -104,13 +105,13 @@ func handleGroupByFuncExprDateHisto(funcExpr *sqlparser.FuncExpr) (msi, error) {
 			}
 			rightStr := sqlparser.String(comparisonExpr.Right)
 			rightStr = strings.Replace(rightStr, `'`, ``, -1)
-			if string(left.Name) == "field" {
+			if left.Name.Lowered() == "field" {
 				field = rightStr
 			}
-			if string(left.Name) == "interval" {
+			if left.Name.Lowered() == "interval" {
 				interval = rightStr
 			}
-			if string(left.Name) == "format" {
+			if left.Name.Lowered() == "format" {
 				format = rightStr
 			}
 
@@ -142,7 +143,7 @@ func handleGroupByFuncExprRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 			"to":   valTo,
 		}
 	}
-	innerMap[string(funcExpr.Name)] = msi{
+	innerMap[funcExpr.Name.String()] = msi{
 		"field":  sqlparser.String(funcExpr.Exprs[0]),
 		"ranges": rangeMapList,
 	}
@@ -160,7 +161,7 @@ func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 	)
 
 	for _, expr := range funcExpr.Exprs {
-		nonStarExpr, ok := expr.(*sqlparser.NonStarExpr)
+		nonStarExpr, ok := expr.(*sqlparser.AliasedExpr)
 		if !ok {
 			return nil, errors.New("elasticsql: unsupported star expression in function date_range")
 		}
@@ -168,7 +169,8 @@ func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 		switch item := nonStarExpr.Expr.(type) {
 		case *sqlparser.ComparisonExpr:
 			colName := sqlparser.String(item.Left)
-			equalVal := sqlparser.String(item.Right.(sqlparser.StrVal))
+			equalVal := sqlparser.String(item.Right.(*sqlparser.SQLVal))
+			//fmt.Printf("%#v", sqlparser.String(item.Right))
 			equalVal = strings.Trim(equalVal, `'`)
 
 			switch colName {
@@ -179,8 +181,9 @@ func handleGroupByFuncExprDateRange(funcExpr *sqlparser.FuncExpr) (msi, error) {
 			default:
 				return nil, errors.New("elasticsql: unsupported column name " + colName)
 			}
-		case sqlparser.StrVal:
-			rangeList = append(rangeList, sqlparser.String(item))
+		case *sqlparser.SQLVal:
+			skippedString := strings.Trim(sqlparser.String(item), "`")
+			rangeList = append(rangeList, skippedString)
 		default:
 			return nil, errors.New("elasticsql: unsupported expression " + sqlparser.String(expr))
 		}
@@ -214,7 +217,7 @@ func handleGroupByFuncExpr(funcExpr *sqlparser.FuncExpr, child msi) (msi, error)
 	var innerMap msi
 	var err error
 
-	switch string(funcExpr.Name) {
+	switch funcExpr.Name.Lowered() {
 	case "date_histogram":
 		innerMap, err = handleGroupByFuncExprDateHisto(funcExpr)
 	case "range":
@@ -291,7 +294,7 @@ func extractFuncAndColFromSelect(sqlSelect sqlparser.SelectExprs) ([]*sqlparser.
 	for _, v := range sqlSelect {
 		// non star expressioin means column name
 		// or some aggregation functions
-		expr, ok := v.(*sqlparser.NonStarExpr)
+		expr, ok := v.(*sqlparser.AliasedExpr)
 		if !ok {
 			// no need to handle, star expression * just skip is ok
 			continue

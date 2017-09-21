@@ -14,7 +14,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	// top level node pass in an empty interface
 	// to tell the children this is root
 	// is there any better way?
-	var rootParent sqlparser.BoolExpr
+	var rootParent sqlparser.Expr
 	var defaultQueryMapStr = `{"bool" : {"must": [{"match_all" : {}}]}}`
 	var queryMapStr string
 
@@ -72,8 +72,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 	var orderByArr []string
 	if aggFlag == false {
 		for _, orderByExpr := range sel.OrderBy {
-			field := strings.Replace(sqlparser.String(orderByExpr.Expr), "`", "", -1)
-			orderByStr := fmt.Sprintf(`{"%v": "%v"}`, field, orderByExpr.Direction)
+			orderByStr := fmt.Sprintf(`{"%v": "%v"}`, strings.Replace(sqlparser.String(orderByExpr.Expr), "`", "", -1), orderByExpr.Direction)
 			orderByArr = append(orderByArr, orderByStr)
 		}
 	}
@@ -106,7 +105,7 @@ func handleSelect(sel *sqlparser.Select) (dsl string, esType string, err error) 
 // if the where is empty, need to check whether to agg or not
 func checkNeedAgg(sqlSelect sqlparser.SelectExprs) bool {
 	for _, v := range sqlSelect {
-		expr, ok := v.(*sqlparser.NonStarExpr)
+		expr, ok := v.(*sqlparser.AliasedExpr)
 		if !ok {
 			// no need to handle, star expression * just skip is ok
 			continue
@@ -121,26 +120,10 @@ func checkNeedAgg(sqlSelect sqlparser.SelectExprs) bool {
 }
 
 func buildNestedFuncStrValue(nestedFunc *sqlparser.FuncExpr) (string, error) {
-	var result string
-	switch string(nestedFunc.Name) {
-	case "group_concat":
-		for _, nestedExpr := range nestedFunc.Exprs {
-			switch nestedExpr.(type) {
-			case *sqlparser.NonStarExpr:
-				nonStarExpr := nestedExpr.(*sqlparser.NonStarExpr)
-				result += strings.Trim(sqlparser.String(nonStarExpr), `'`)
-			default:
-				return "", errors.New("elasticsql: unsupported expression" + sqlparser.String(nestedExpr))
-			}
-		}
-		//TODO support more functions
-	default:
-		return "", errors.New("elasticsql: unsupported function" + string(nestedFunc.Name))
-	}
-	return result, nil
+	return "", errors.New("elasticsql: unsupported function" + nestedFunc.Name.String())
 }
 
-func handleSelectWhereAndExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+func handleSelectWhereAndExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	andExpr := (*expr).(*sqlparser.AndExpr)
 	leftExpr := andExpr.Left
 	rightExpr := andExpr.Right
@@ -169,7 +152,7 @@ func handleSelectWhereAndExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *s
 	return fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr), nil
 }
 
-func handleSelectWhereOrExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+func handleSelectWhereOrExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	orExpr := (*expr).(*sqlparser.OrExpr)
 	leftExpr := orExpr.Left
 	rightExpr := orExpr.Right
@@ -200,16 +183,16 @@ func handleSelectWhereOrExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sq
 	return fmt.Sprintf(`{"bool" : {"should" : [%v]}}`, resultStr), nil
 }
 
-func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, bool, error) {
+func buildComparisonExprRightStr(expr sqlparser.Expr) (string, bool, error) {
 	var rightStr string
 	var err error
 	var missingCheck = false
 	switch expr.(type) {
-	case sqlparser.StrVal:
+	case *sqlparser.SQLVal:
 		rightStr = sqlparser.String(expr)
 		rightStr = strings.Trim(rightStr, `'`)
-	case sqlparser.NumVal:
-		rightStr = sqlparser.String(expr)
+	case *sqlparser.GroupConcatExpr:
+		return "", missingCheck, errors.New("elasticsql: group_concat not supported")
 	case *sqlparser.FuncExpr:
 		// parse nested
 		funcExpr := expr.(*sqlparser.FuncExpr)
@@ -232,7 +215,7 @@ func buildComparisonExprRightStr(expr sqlparser.ValExpr) (string, bool, error) {
 	return rightStr, missingCheck, err
 }
 
-func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
 	colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
 
@@ -301,7 +284,7 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.BoolExpr, topLevel bool, pa
 	return resultStr, nil
 }
 
-func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparser.BoolExpr) (string, error) {
+func handleSelectWhere(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	if expr == nil {
 		return "", errors.New("elasticsql: error expression cannot be nil here")
 	}
@@ -315,8 +298,8 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 	case *sqlparser.ComparisonExpr:
 		return handleSelectWhereComparisonExpr(expr, topLevel, parent)
 
-	case *sqlparser.NullCheck:
-		return "", errors.New("elasticsql: null check expression currently not supported")
+	case *sqlparser.IsExpr:
+		return "", errors.New("elasticsql: is expression currently not supported")
 	case *sqlparser.RangeCond:
 		// between a and b
 		// the meaning is equal to range query
@@ -338,8 +321,8 @@ func handleSelectWhere(expr *sqlparser.BoolExpr, topLevel bool, parent *sqlparse
 
 		return resultStr, nil
 
-	case *sqlparser.ParenBoolExpr:
-		parentBoolExpr := (*expr).(*sqlparser.ParenBoolExpr)
+	case *sqlparser.ParenExpr:
+		parentBoolExpr := (*expr).(*sqlparser.ParenExpr)
 		boolExpr := parentBoolExpr.Expr
 
 		// if paren is the top level, bool must is needed
