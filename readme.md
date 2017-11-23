@@ -5,6 +5,15 @@ Overview
 [![Coverage Status](https://coveralls.io/repos/github/cch123/elasticsql/badge.svg?branch=master)](https://coveralls.io/github/cch123/elasticsql?branch=master)
 [![Go Report Card](https://goreportcard.com/badge/github.com/cch123/elasticsql)](https://goreportcard.com/report/github.com/cch123/elasticsql)
 
+```
+ _____ _         _     ____ _____ ___  ____  ____   ___   _
+| ____| |       / \   / ___|_   _|_ _|/ ___|/ ___| / _ \ | |
+|  _| | |      / _ \  \___ \ | |  | || |    \___ \| | | || |
+| |___| |___  / ___ \  ___) || |  | || |___  ___) | |_| || |___
+|_____|_____|/_/   \_\|____/ |_| |___|\____||____/ \__\_\|_____|
+```
+
+
 This tool converts sql to elasticsearch dsl
 
 Currently support:
