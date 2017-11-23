@@ -2,9 +2,10 @@ sudo: false
 language: go
 
 go:
-  - 1.5
   - 1.6
   - 1.7
+  - 1.8
+  - 1.9
 
 before_install:
   - go get -v github.com/mattn/goveralls
