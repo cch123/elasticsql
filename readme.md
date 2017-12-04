@@ -130,9 +130,9 @@ select * from `order` where `timestamp` = 1 and `desc`.id > 0
 
 Warning
 ------------
-To use this tool, you need to understand the term and match phrase of elasticsearch.
+To use this tool, you need to understand the term query and match phrase query of elasticsearch.
 
-Setting a field to analyzed or not analyzed will get different result.
+Setting a field to analyzed or not analyzed will get different results.
 
 Details
 ------------
@@ -140,7 +140,7 @@ For more details of convertion, please refer to the [wiki](https://github.com/cc
 
 Other info
 ------------
-When writing this tool, I tried to avoid the deprecated dsl filters and aggregations, so it is compatable with most versions of the elasticsearch
+When writing this tool, I tried to avoid the deprecated dsl filters and aggregations, so it is compatible with most versions of the elasticsearch
 
 If you have any advices or ideas, welcome to submit an issue or Pull Request!
 
