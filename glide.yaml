@@ -1,3 +1,0 @@
-package: github.com/cch123/elasticsql
-import:
-- package: github.com/xwb1989/sqlparser
