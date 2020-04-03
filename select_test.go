@@ -25,6 +25,8 @@ var unsupportedCaseList = []string{
 	"select * from a where 1=a",
 	"select * from a where id is null",
 	"select * from a group by sqrt(id)",
+	"select * from aaa where  a= 1 and multi_match(zz=1, query='this is a test', fields=(title,title.origin), type=phrase)",
+	"select * from aaa where zz(k=2)",
 }
 
 var selectCaseMap = map[string]string{
