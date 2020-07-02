@@ -1,0 +1,3 @@
+package elasticsql
+
+func fff() {}
