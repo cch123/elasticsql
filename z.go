@@ -1,0 +1,5 @@
+package elasticsql
+
+func init() {}
+
+
