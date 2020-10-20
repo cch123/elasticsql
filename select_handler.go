@@ -313,6 +313,7 @@ func handleSelectWhere(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Ex
 		}
 
 		colNameStr := sqlparser.String(colName)
+		colNameStr = strings.Replace(colNameStr, "`", "", -1)
 		fromStr := strings.Trim(sqlparser.String(rangeCond.From), `'`)
 		toStr := strings.Trim(sqlparser.String(rangeCond.To), `'`)
 
