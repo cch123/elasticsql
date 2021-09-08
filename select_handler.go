@@ -245,7 +245,7 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 		return "", err
 	}
 
-	// escape rightStr
+	// unescape rightStr
 	escapeStr := sqlparser.String(comparisonExpr.Escape)
 	escapeStr = strings.Trim(escapeStr, "'")  // remove quote both sides
 	rightStr = unescapeSql(rightStr, escapeStr)
