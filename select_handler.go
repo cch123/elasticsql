@@ -186,9 +186,6 @@ func handleSelectWhereOrExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlpar
 }
 
 func buildComparisonExprRightStr(expr sqlparser.Expr) (string, bool, error) {
-
-	fmt.Printf("expr: %+v\n", expr)
-
 	var rightStr string
 	var err error
 	var missingCheck = false
