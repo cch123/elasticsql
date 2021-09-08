@@ -227,12 +227,16 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 
 	colNameStr := sqlparser.String(colName)
 	colNameStr = strings.Replace(colNameStr, "`", "", -1)
-
-	fmt.Printf("escape: %+v\n", sqlparser.String(comparisonExpr.Escape))
-
 	rightStr, missingCheck, err := buildComparisonExprRightStr(comparisonExpr.Right)
 	if err != nil {
 		return "", err
+	}
+
+	// unescape character
+	escapeStr := sqlparser.String(comparisonExpr.Escape)
+	fmt.Printf("escapeStr type:%T, value:%+v\n", escapeStr, escapeStr)
+	if escapeStr != "" {
+		rightStr = strings.ReplaceAll(rightStr, escapeStr, "")
 	}
 
 	resultStr := ""
