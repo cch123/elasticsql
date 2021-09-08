@@ -217,6 +217,19 @@ func buildComparisonExprRightStr(expr sqlparser.Expr) (string, bool, error) {
 	return rightStr, missingCheck, err
 }
 
+func unescapeSql(sql, escapeStr string) string {
+	resSql := ""
+	strSegments := strings.Split(sql, escapeStr)
+	for _, segment := range strSegments {
+		if segment == "" {
+			resSql += escapeStr  // continuous escapeStr, only remove the first one
+		} else {
+			resSql += segment
+		}
+	}
+	return resSql
+}
+
 func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	comparisonExpr := (*expr).(*sqlparser.ComparisonExpr)
 	colName, ok := comparisonExpr.Left.(*sqlparser.ColName)
@@ -232,13 +245,9 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 		return "", err
 	}
 
-	// unescape character
 	escapeStr := sqlparser.String(comparisonExpr.Escape)
-	fmt.Printf("escapeStr type:%T, value:%+v\n", escapeStr, escapeStr)
-	if escapeStr != "" {
-		rightStr = strings.ReplaceAll(rightStr, escapeStr, "")
-	}
-
+	escapeStr = strings.Trim(escapeStr, "'")  // remove quote both sides
+	rightStr = unescapeSql(rightStr, escapeStr)
 	resultStr := ""
 
 	switch comparisonExpr.Operator {
