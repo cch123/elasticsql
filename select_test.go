@@ -75,6 +75,8 @@ var selectCaseMap = map[string]string{
 	"select * from aaa where multi_match(query='this is a test', fields=(title,title.origin))":                        `{"query" : {"multi_match" : {"query" : "this is a test", "fields" : ["title","title.origin"]}},"from" : 0,"size" : 1}`,
 	"select * from aaa where  a= 1 and multi_match(query='this is a test', fields=(title,title.origin))":              `{"query" : {"bool" : {"must" : [{"match_phrase" : {"a" : {"query" : "1"}}},{"multi_match" : {"query" : "this is a test", "fields" : ["title","title.origin"]}}]}},"from" : 0,"size" : 1}`,
 	"select * from aaa where  a= 1 and multi_match(query='this is a test', fields=(title,title.origin), type=phrase)": `{"query" : {"bool" : {"must" : [{"match_phrase" : {"a" : {"query" : "1"}}},{"multi_match" : {"query" : "this is a test", "type" : "phrase", "fields" : ["title","title.origin"]}}]}},"from" : 0,"size" : 1}`,
+	"SELECT `id`, `name` FROM `student` WHERE (`name` LIKE '%aaa!_bbb!!ccc%' ESCAPE '!') ORDER BY `updateTime` DESC LIMIT 10": `{"query" : {"bool" : {"must" : [{"match_phrase" : {"name" : {"query" : "aaa_bbb!ccc"}}}]}},"from" : 0,"size" : 10,"sort" : [{"updateTime": "desc"}]}`,
+	"SELECT `id`, `name` FROM `student` WHERE (`name` LIKE '%aaa!_bbb!!ccc%') ORDER BY `updateTime` DESC LIMIT 10": `{"query" : {"bool" : {"must" : [{"match_phrase" : {"name" : {"query" : "aaa!_bbb!!ccc"}}}]}},"from" : 0,"size" : 10,"sort" : [{"updateTime": "desc"}]}`,
 }
 
 func TestSupported(t *testing.T) {
