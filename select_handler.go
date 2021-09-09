@@ -222,7 +222,7 @@ func unescapeSql(sql, escapeStr string) string {
 	strSegments := strings.Split(sql, escapeStr)
 	for _, segment := range strSegments {
 		if segment == "" {
-			resSql += escapeStr  // continuous escapeStr, only remove the first one
+			resSql += escapeStr // continuous escapeStr, only remove the first one
 		} else {
 			resSql += segment
 		}
@@ -247,7 +247,7 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 
 	// unescape rightStr
 	escapeStr := sqlparser.String(comparisonExpr.Escape)
-	escapeStr = strings.Trim(escapeStr, "'")  // remove quote both sides
+	escapeStr = strings.Trim(escapeStr, "'") // remove quote both sides
 	rightStr = unescapeSql(rightStr, escapeStr)
 	resultStr := ""
 
