@@ -119,7 +119,7 @@ will produce :
     ]
 }
 
-aaa
+
 ```
 
 If your sql contains some keywords, eg. order, timestamp, don't forget to escape these fields as follows:
