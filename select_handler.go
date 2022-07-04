@@ -303,6 +303,38 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 	return resultStr, nil
 }
 
+func handleIsExpr(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
+	isExpr := (*expr).(*sqlparser.IsExpr)
+	colName, ok := isExpr.Expr.(*sqlparser.ColName)
+
+	if !ok {
+		return "", errors.New("elasticsql: invalid is expression, the left must be a column name")
+	}
+
+	colNameStr := sqlparser.String(colName)
+	colNameStr = strings.Replace(colNameStr, "`", "", -1)
+
+	escapeStr := sqlparser.String(isExpr.Expr)
+	escapeStr = strings.Trim(escapeStr, "'") // remove quote both sides
+	resultStr := ""
+
+	switch isExpr.Operator {
+	case "is null":
+		resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"exists" : {"field" : "%v"}}]}}`, colNameStr)
+	case "is not null":
+		resultStr = fmt.Sprintf(`{"bool": {"must" : [{"exists" : {"field" : "%v"}}]}}`, colNameStr)
+	default:
+		return "", errors.New("elasticsql: invalid is expression, the operator is not supported")
+	}
+
+	// the root node need to have bool and must
+	if topLevel {
+		resultStr = fmt.Sprintf(`{"bool" : {"must" : [%v]}}`, resultStr)
+	}
+
+	return resultStr, nil
+}
+
 func handleSelectWhere(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Expr) (string, error) {
 	if expr == nil {
 		return "", errors.New("elasticsql: error expression cannot be nil here")
@@ -318,7 +350,7 @@ func handleSelectWhere(expr *sqlparser.Expr, topLevel bool, parent *sqlparser.Ex
 		return handleSelectWhereComparisonExpr(expr, topLevel, parent)
 
 	case *sqlparser.IsExpr:
-		return "", errors.New("elasticsql: is expression currently not supported")
+		return handleIsExpr(expr, topLevel, parent)
 	case *sqlparser.RangeCond:
 		// between a and b
 		// the meaning is equal to range query
