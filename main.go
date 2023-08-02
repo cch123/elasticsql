@@ -21,7 +21,7 @@ func ConvertPretty(sql string) (dsl string, table string, err error) {
 		return "", table, err
 	}
 
-	return string(prettifiedDSLBytes.Bytes()), table, err
+	return prettifiedDSLBytes.String(), table, err
 }
 
 // Convert will transform sql to elasticsearch dsl string
