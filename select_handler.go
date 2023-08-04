@@ -203,7 +203,7 @@ func buildComparisonExprRightStr(expr sqlparser.Expr) (string, bool, error) {
 			return "", missingCheck, err
 		}
 	case *sqlparser.ColName:
-		if sqlparser.String(expr) == "missing" {
+		if strings.ToLower(sqlparser.String(expr)) == "missing" {
 			missingCheck = true
 			return "", missingCheck, nil
 		}
@@ -251,6 +251,11 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 	rightStr = unescapeSql(rightStr, escapeStr)
 	resultStr := ""
 
+	// allow eq empty string
+	if rightStr == `<nil>` {
+		rightStr = ""
+	}
+
 	switch comparisonExpr.Operator {
 	case ">=":
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"from" : "%v"}}}`, colNameStr, rightStr)
@@ -258,8 +263,8 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"to" : "%v"}}}`, colNameStr, rightStr)
 	case "=":
 		// field is missing
-		if missingCheck {
-			resultStr = fmt.Sprintf(`{"missing":{"field":"%v"}}`, colNameStr)
+		if missingCheck { // missing was deprecated in 2.2, use exists instead.
+			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"exists":{"field":"%v"}}]}}`, colNameStr)
 		} else {
 			resultStr = fmt.Sprintf(`{"match_phrase" : {"%v" : {"query" : "%v"}}}`, colNameStr, rightStr)
 		}
@@ -268,8 +273,8 @@ func handleSelectWhereComparisonExpr(expr *sqlparser.Expr, topLevel bool, parent
 	case "<":
 		resultStr = fmt.Sprintf(`{"range" : {"%v" : {"lt" : "%v"}}}`, colNameStr, rightStr)
 	case "!=":
-		if missingCheck {
-			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"missing":{"field":"%v"}}]}}`, colNameStr)
+		if missingCheck { // missing was deprecated in 2.2, use exists instead.
+			resultStr = fmt.Sprintf(`{"bool" : {"must" : [{"exists":{"field":"%v"}}]}}`, colNameStr)
 		} else {
 			resultStr = fmt.Sprintf(`{"bool" : {"must_not" : [{"match_phrase" : {"%v" : {"query" : "%v"}}}]}}`, colNameStr, rightStr)
 		}
